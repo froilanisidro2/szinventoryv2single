@@ -1,0 +1,8 @@
+{
+  "lib/auth-utils.ts -> @/app/actions": {
+    "id": "lib/auth-utils.ts -> @/app/actions",
+    "files": [
+      "static/chunks/_app-pages-browser_app_actions_index_ts.js"
+    ]
+  }
+}

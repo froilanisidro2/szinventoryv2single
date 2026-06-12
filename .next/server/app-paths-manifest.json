@@ -1,0 +1,9 @@
+{
+  "/inventory/page": "app/inventory/page.js",
+  "/job-orders/page": "app/job-orders/page.js",
+  "/job-orders/[id]/page": "app/job-orders/[id]/page.js",
+  "/job-orders/[id]/bom-adjustment/page": "app/job-orders/[id]/bom-adjustment/page.js",
+  "/job-orders/[id]/issue/page": "app/job-orders/[id]/issue/page.js",
+  "/job-orders/[id]/return/page": "app/job-orders/[id]/return/page.js",
+  "/material-requests/page": "app/material-requests/page.js"
+}

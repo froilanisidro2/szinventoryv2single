@@ -1,0 +1,65 @@
+{
+  "name": "SprintZeroPH Inventory Management System",
+  "short_name": "SprintZeroPH",
+  "description": "SprintZeroPH Inventory Management System — professional stock, invoicing, and order management for SMEs",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#0ea5e9",
+  "background_color": "#ffffff",
+  "dir": "ltr",
+  "lang": "en-US",
+  "categories": ["business", "productivity"],
+  "screenshots": [
+    {
+      "src": "/screenshots/desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/screenshots/mobile.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
+  "icons": [],
+  "shortcuts": [
+    {
+      "name": "Create Invoice",
+      "short_name": "Invoice",
+      "description": "Create a new invoice quickly",
+      "url": "/invoices/new"
+    },
+    {
+      "name": "View Inventory",
+      "short_name": "Inventory",
+      "description": "Check current inventory levels",
+      "url": "/inventory"
+    }
+  ],
+  "share_target": {
+    "action": "/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "files",
+          "accept": [
+            "application/pdf",
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          ]
+        }
+      ]
+    }
+  },
+  "prefer_related_applications": false,
+  "related_applications": []
+}
