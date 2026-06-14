@@ -333,7 +333,7 @@ function WidgetChart({ data, chartType, color }: { data: { name: string; value: 
         <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeOpacity={0.3} />
         <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" interval={0} />
         <YAxis tick={{ fontSize: 10 }} tickFormatter={tickFmt} width={40} />
-        <Tooltip formatter={(v: number) => [v.toLocaleString(), 'Value']} />
+        <Tooltip formatter={(v: any) => [Number(v).toLocaleString(), 'Value']} />
         <Bar dataKey="value" fill={color} radius={[3, 3, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
@@ -345,7 +345,7 @@ function WidgetChart({ data, chartType, color }: { data: { name: string; value: 
         <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeOpacity={0.3} />
         <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" interval={0} />
         <YAxis tick={{ fontSize: 10 }} tickFormatter={tickFmt} width={40} />
-        <Tooltip formatter={(v: number) => [v.toLocaleString(), 'Value']} />
+        <Tooltip formatter={(v: any) => [Number(v).toLocaleString(), 'Value']} />
         <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={{ r: 3 }} />
       </LineChart>
     </ResponsiveContainer>
@@ -363,7 +363,7 @@ function WidgetChart({ data, chartType, color }: { data: { name: string; value: 
         <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeOpacity={0.3} />
         <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" interval={0} />
         <YAxis tick={{ fontSize: 10 }} tickFormatter={tickFmt} width={40} />
-        <Tooltip formatter={(v: number) => [v.toLocaleString(), 'Value']} />
+        <Tooltip formatter={(v: any) => [Number(v).toLocaleString(), 'Value']} />
         <Area type="monotone" dataKey="value" stroke={color} fill={`url(#grad-${color.replace('#','')})`} strokeWidth={2} />
       </AreaChart>
     </ResponsiveContainer>
@@ -373,10 +373,10 @@ function WidgetChart({ data, chartType, color }: { data: { name: string; value: 
     <ResponsiveContainer width="100%" height={200}>
       <PieChart>
         <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75}
-          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+          label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`} labelLine={false}>
           {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
         </Pie>
-        <Tooltip formatter={(v: number) => [v.toLocaleString(), 'Value']} />
+        <Tooltip formatter={(v: any) => [Number(v).toLocaleString(), 'Value']} />
       </PieChart>
     </ResponsiveContainer>
   );
@@ -482,7 +482,7 @@ const DEFAULT_WIDGET: Omit<Widget, 'id'> = {
   groupBy: 'status',
   dateFrom: '',
   dateTo: '',
-  color: COLORS[0],
+  color: COLORS[0]!,
 };
 
 function WidgetEditor({

@@ -4,11 +4,11 @@ import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface ExportPayload {
-  kpis: Record<string, number>;
-  monthlyRevenue: { month: string; amount: number }[];
-  topProducts: { name: string; value: number; qty: number; sku: string }[];
-  invoiceStatuses: Record<string, number>;
-  poStatuses: Record<string, number>;
+  kpis?: Record<string, number>;
+  monthlyRevenue?: { month: string; amount: number }[];
+  topProducts?: { name: string; value: number; qty: number; sku: string }[];
+  invoiceStatuses?: Record<string, number>;
+  poStatuses?: Record<string, number>;
 }
 
 export function ExportReportButton({ data }: { data: ExportPayload }) {
@@ -21,7 +21,7 @@ export function ExportReportButton({ data }: { data: ExportPayload }) {
 
     lines.push('=== KPIs ===');
     lines.push('Metric,Value');
-    for (const [key, val] of Object.entries(data.kpis)) {
+    for (const [key, val] of Object.entries(data.kpis ?? {})) {
       const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase());
       lines.push(`"${label}",${val}`);
     }
@@ -29,28 +29,28 @@ export function ExportReportButton({ data }: { data: ExportPayload }) {
 
     lines.push('=== Monthly Revenue (last 6 months) ===');
     lines.push('Month,Amount (PHP)');
-    for (const m of data.monthlyRevenue) {
+    for (const m of data.monthlyRevenue ?? []) {
       lines.push(`${m.month},${m.amount.toFixed(2)}`);
     }
     lines.push('');
 
     lines.push('=== Top Products by Stock Value ===');
     lines.push('Product,SKU,Qty on Hand,Stock Value (PHP)');
-    for (const p of data.topProducts) {
+    for (const p of data.topProducts ?? []) {
       lines.push(`"${p.name}","${p.sku}",${p.qty},${p.value.toFixed(2)}`);
     }
     lines.push('');
 
     lines.push('=== Invoice Status Breakdown ===');
     lines.push('Status,Count');
-    for (const [status, count] of Object.entries(data.invoiceStatuses)) {
+    for (const [status, count] of Object.entries(data.invoiceStatuses ?? {})) {
       lines.push(`"${status.replace(/_/g, ' ')}",${count}`);
     }
     lines.push('');
 
     lines.push('=== Purchase Order Status Breakdown ===');
     lines.push('Status,Count');
-    for (const [status, count] of Object.entries(data.poStatuses)) {
+    for (const [status, count] of Object.entries(data.poStatuses ?? {})) {
       lines.push(`"${status.replace(/_/g, ' ')}",${count}`);
     }
 

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getCompanyById, updateCompany } from '@/app/actions';
 import { getSuperAdminSession } from '@/lib/auth-utils';
-import { PLANS, formatLimit, formatPrice } from '@/lib/plans';
+import { PLANS, formatLimit } from '@/lib/plans';
 import Link from 'next/link';
 
 const INPUT_CLASS =

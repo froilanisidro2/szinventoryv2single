@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft, Hammer, CheckCircle2, XCircle, Play, PackageOpen, RotateCcw, AlertCircle, ClipboardList,
@@ -72,6 +72,7 @@ type Tab = 'bom' | 'bomRequests' | 'issues' | 'returns';
 export default function JobOrderDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params.id as string;
 
   const [job, setJob] = useState<JobOrder | null>(null);
@@ -82,7 +83,7 @@ export default function JobOrderDetailPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [tab, setTab] = useState<Tab>('bom');
+  const [tab, setTab] = useState<Tab>((searchParams.get('tab') as Tab) || 'bom');
   const [mrsItemsMap, setMrsItemsMap] = useState<Record<string, any[]>>({});
   const [canApprove, setCanApprove] = useState(false);
   const [canIssue, setCanIssue] = useState(false);
@@ -143,7 +144,7 @@ export default function JobOrderDetailPage() {
         const itemResults = await Promise.all(mrsArr.map((m: any) => getMaterialReturnSlipItems(m.id)));
         const map: Record<string, any[]> = {};
         mrsArr.forEach((m: any, i: number) => {
-          map[m.id] = Array.isArray(itemResults[i].data) ? itemResults[i].data : [];
+          map[m.id] = Array.isArray(itemResults[i]?.data) ? itemResults[i]!.data : [];
         });
         setMrsItemsMap(map);
       }
@@ -219,7 +220,7 @@ export default function JobOrderDetailPage() {
         toast.error('Failed to submit request: ' + res.error.message);
         return;
       }
-      toast.success('BOM change request submitted for approval');
+      toast.success('MRF submitted for approval');
       setRequestModal(null);
       setBomSearch('');
       setShowBomSuggestions(false);
@@ -242,7 +243,7 @@ export default function JobOrderDetailPage() {
         toast.error(`Failed to ${approve ? 'approve' : 'reject'} request: ` + res.error.message);
         return;
       }
-      toast.success(`Request ${approve ? 'approved and applied to BOM' : 'rejected'}`);
+      toast.success(`MRF ${approve ? 'approved and applied to BOM' : 'rejected'}`);
       const [bomRes, bomReqRes] = await Promise.all([getJobOrderBOM(id), getJobOrderBOMRequests(id)]);
       setBom(Array.isArray(bomRes.data) ? bomRes.data : []);
       setBomRequests(Array.isArray(bomReqRes.data) ? bomReqRes.data : []);
@@ -327,7 +328,7 @@ export default function JobOrderDetailPage() {
           {canRequestBOM && !['completed', 'cancelled'].includes(job.status) && (
             <Link href={`/job-orders/${id}/bom-adjustment`}>
               <Button className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1">
-                <ClipboardList className="h-4 w-4" />BOM Request
+                <ClipboardList className="h-4 w-4" />Request MRF
               </Button>
             </Link>
           )}
@@ -389,7 +390,7 @@ export default function JobOrderDetailPage() {
                 {t === 'bom'
                   ? `Bill of Materials (${bom.length})`
                   : t === 'bomRequests'
-                  ? `BOM Requests (${bomRequests.length})`
+                  ? `MRF Requests (${bomRequests.length})`
                   : t === 'issues'
                   ? `Issue Slips (${misSlips.length})`
                   : `Return Slips (${mrsSlips.length})`}
@@ -403,13 +404,14 @@ export default function JobOrderDetailPage() {
             {bomRequests.length === 0 ? (
               <div className="flex items-center justify-center py-10 text-gray-400">
                 <AlertCircle className="h-5 w-5 mr-2" />
-                No BOM adjustment requests yet.
+                No MRF requests yet.
               </div>
             ) : (
               <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 overflow-hidden">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                     <tr>
+                      <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">MRF #</th>
                       <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Material</th>
                       <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-400">Requested</th>
                       <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-400">Available</th>
@@ -424,6 +426,9 @@ export default function JobOrderDetailPage() {
                       const insufficientStock = r.status === 'pending_approval' && Number(r.requested_quantity) > available;
                       return (
                       <tr key={r.id}>
+                        <td className="px-4 py-2 font-mono text-xs text-gray-500 dark:text-gray-400">
+                          {r.request_number || '—'}
+                        </td>
                         <td className="px-4 py-2">
                           <p className="font-medium text-gray-900 dark:text-white">{r.product?.name || 'Item'}</p>
                           {r.product?.sku && (
@@ -561,7 +566,7 @@ export default function JobOrderDetailPage() {
                               onMouseDown={() => openRequestModal({ productId: p.id, productName: p.name, productSku: p.sku, currentQty: 0 })}
                               className="flex-shrink-0 text-xs text-amber-600 dark:text-amber-400 hover:underline"
                             >
-                              Request to add to BOM
+                              Request via MRF
                             </button>
                           )}
                         </div>
@@ -904,7 +909,7 @@ export default function JobOrderDetailPage() {
       {requestModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 p-6 shadow-xl">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Request BOM Adjustment</h2>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">New MRF Request</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
               {requestModal.productName}{requestModal.productSku ? ` (${requestModal.productSku})` : ''}
               {requestModal.bomId

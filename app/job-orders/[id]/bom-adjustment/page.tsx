@@ -126,7 +126,7 @@ export default function RequestMaterialsPage() {
         created++;
       }
       if (created > 0) {
-        toast.success(`${created} material request${created > 1 ? 's' : ''} submitted for approval`);
+        toast.success(`${created} MRF${created > 1 ? 's' : ''} submitted for approval`);
         router.push(`/job-orders/${joId}`);
       }
     } catch {
@@ -152,7 +152,7 @@ export default function RequestMaterialsPage() {
         <div>
           <div className="flex items-center gap-2">
             <ClipboardList className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">Request BOM Adjustment</h1>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">New MRF Request</h1>
           </div>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {joNumber} — {jobTitle}
@@ -161,8 +161,8 @@ export default function RequestMaterialsPage() {
       </div>
 
       <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4 text-sm text-amber-700 dark:text-amber-300">
-        This requests more of an item to be allocated to <strong>this Job Order&apos;s Bill of Materials</strong> for production use — it does not place a purchase order with a supplier (that's what a Material Request / MRF is for).
-        Submitting here does not change the BOM immediately — each item becomes a pending request that a Processor/Admin must approve before it's added.
+        This MRF requests more of an item to be allocated to <strong>this Job Order&apos;s Bill of Materials</strong> for production use — it does not place a purchase order with a supplier (that's what a Procurement MRF is for).
+        Submitting here does not change the BOM immediately — each item becomes a pending MRF that a Processor/Admin must approve before it's added.
       </div>
 
       <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 p-6 space-y-6">

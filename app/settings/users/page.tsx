@@ -167,6 +167,7 @@ export default function UsersPage() {
       phone:      u.phone ?? '',
       role_id:    u.role_id ?? '',
     });
+    setEditingWhIds(userWarehouseMap[u.id] ?? []);
     setEditErrors({});
     setShowEditModal(true);
     setOpenDropdown(null);
@@ -190,6 +191,11 @@ export default function UsersPage() {
         ...(editForm.role_id ? { role_id: editForm.role_id } : {}),
       });
       if (result.error) { toast.error('Failed to update user'); return; }
+
+      const { error: whError } = await setUserWarehouseAssignments(selectedUser.id, editingWhIds);
+      if (whError) { toast.error('User updated, but failed to save warehouse assignments'); return; }
+      setUserWarehouseMap((p) => ({ ...p, [selectedUser.id]: editingWhIds }));
+
       toast.success('User updated successfully');
       setShowEditModal(false);
       loadAll();
@@ -624,6 +630,31 @@ export default function UsersPage() {
                   </select>
                 </div>
               </div>
+              {warehouses.length > 0 && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <span className="flex items-center gap-1.5">
+                      <Warehouse className="h-4 w-4 text-gray-400" />
+                      Warehouse Access
+                      <span className="text-xs text-gray-500 font-normal">(blank = all warehouses)</span>
+                    </span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                    {warehouses.map((wh) => {
+                      const checked = editingWhIds.includes(wh.id);
+                      return (
+                        <label key={wh.id} onClick={() => toggleWh(wh.id)}
+                          className={`flex items-center gap-2 p-2 rounded-lg border-2 cursor-pointer transition-colors ${checked ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'}`}>
+                          <div className={`h-4 w-4 rounded flex items-center justify-center flex-shrink-0 ${checked ? 'bg-primary-600' : 'border border-gray-400 dark:border-gray-500'}`}>
+                            {checked && <Check className="h-3 w-3 text-white" />}
+                          </div>
+                          <span className="text-sm text-gray-900 dark:text-white truncate">{fmtWarehouse(wh)}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex gap-3 mt-6">
               <button onClick={() => setShowEditModal(false)} className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm">Cancel</button>

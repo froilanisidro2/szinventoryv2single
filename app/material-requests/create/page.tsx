@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Trash2 } from 'lucide-react';
@@ -20,6 +20,14 @@ interface LineItem {
 }
 
 export default function CreateMaterialRequestPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-20 text-gray-500">Loading…</div>}>
+      <CreateMaterialRequestForm />
+    </Suspense>
+  );
+}
+
+function CreateMaterialRequestForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const prefilledProductId = searchParams.get('product_id') ?? '';
@@ -140,7 +148,7 @@ export default function CreateMaterialRequestPage() {
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">New Material Request (MRF)</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Procurement request — for purchasing materials from a supplier. To allocate more of an item to a Job Order&apos;s BOM, use that JO&apos;s &quot;Request BOM Adjustment&quot; instead.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Procurement MRF — for purchasing materials from a supplier. To allocate more of an item to a Job Order&apos;s Bill of Materials, use that JO&apos;s &quot;Request MRF&quot; instead.</p>
         </div>
       </div>
 

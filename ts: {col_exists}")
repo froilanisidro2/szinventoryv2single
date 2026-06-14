@@ -1,9 +1,0 @@
-                  id                  |     name      | quantity_on_hand | quantity_rejected 
---------------------------------------+---------------+------------------+-------------------
- fcddaded-5141-484e-8bdf-96968962c620 | Laptop Pro 15 |               12 |                 0
- 682f697c-85b0-405b-98b6-a398c377d2d7 | From App Test |               10 |                 0
- 484b0d73-579d-4e1e-8d65-71868d78d26d | App Test 2    |               10 |                 0
- 539f8362-d99f-4a8f-895b-6655d84b2b5e | SparkPlug     |               15 |                 0
- 539f8362-d99f-4a8f-895b-6655d84b2b5e | SparkPlug     |               60 |                 0
-(5 rows)
-

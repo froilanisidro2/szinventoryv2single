@@ -30,10 +30,10 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { href: '/inventory',           label: 'Inventory',           icon: Boxes,           permission: 'inventory:read' },
   { href: '/products',            label: 'Products',            icon: Package,         permission: 'inventory:read' },
   { href: '/purchase-orders',     label: 'Purchase Orders',     icon: ShoppingCart,    permission: 'inventory:write' },
-  { href: '/stock-transfers',     label: 'Stock Transfers',     icon: ArrowRightLeft,  permission: 'inventory:write' },
-  { href: '/inventory/movements', label: 'Stock Movements',     icon: Activity,        permission: 'inventory:read' },
   { href: '/material-requests',   label: 'Material Requests',   icon: ClipboardList,   permission: 'inventory:write' },
   { href: '/job-orders',          label: 'Job Orders',          icon: Hammer,          permission: 'inventory:write' },
+  { href: '/stock-transfers',     label: 'Stock Transfers',     icon: ArrowRightLeft,  permission: 'inventory:write' },
+  { href: '/inventory/movements', label: 'Stock Movements',     icon: Activity,        permission: 'inventory:read' },
   { href: '/reports-analytics',   label: 'Reports & Analytics', icon: BarChart3,       permission: 'reports:read' },
 ];
 

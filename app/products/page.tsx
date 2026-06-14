@@ -170,7 +170,13 @@ export default function ProductsPage() {
         for (const warehouse of warehousesData) {
           const binsResponse = await getBinLocationsByWarehouse(warehouse.id);
           if (!binsResponse.error && binsResponse.data) {
-            binLocationsByWarehouse[warehouse.id] = Array.isArray(binsResponse.data) ? binsResponse.data : [];
+            binLocationsByWarehouse[warehouse.id] = (Array.isArray(binsResponse.data) ? binsResponse.data : []).map((b: any) => ({
+              ...b,
+              zone: b.zone ?? '',
+              aisle: b.aisle ?? '',
+              shelf: b.shelf ?? '',
+              bin_number: b.bin_number ?? '',
+            }));
           }
         }
         setBinLocations(binLocationsByWarehouse);
@@ -384,7 +390,7 @@ export default function ProductsPage() {
         toast.success('Product updated successfully');
       } else {
         const createPayload = { ...payload, company_id: defaultCompanyId };
-        const response = await createProduct(createPayload);
+        const response = await createProduct(createPayload as any);
         console.log('Create response:', response);
         if (!response || response.error) {
           toast.error(`Failed to create product: ${response?.error?.message || 'Unknown error'}`);

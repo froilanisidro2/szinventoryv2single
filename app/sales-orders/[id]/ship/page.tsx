@@ -130,7 +130,13 @@ export default function ShipGoodsPage() {
       for (const warehouse of warehousesData) {
         const binsResponse = await getBinLocationsByWarehouse(warehouse.id);
         if (!binsResponse.error && binsResponse.data) {
-          binLocationsByWarehouse[warehouse.id] = Array.isArray(binsResponse.data) ? binsResponse.data : [];
+          binLocationsByWarehouse[warehouse.id] = (Array.isArray(binsResponse.data) ? binsResponse.data : []).map((b: any) => ({
+            ...b,
+            zone: b.zone ?? '',
+            aisle: b.aisle ?? '',
+            shelf: b.shelf ?? '',
+            bin_number: b.bin_number ?? '',
+          }));
         }
       }
       setBinLocations(binLocationsByWarehouse);

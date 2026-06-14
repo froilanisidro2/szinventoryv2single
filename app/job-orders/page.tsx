@@ -185,7 +185,7 @@ export default function JobOrdersPage() {
 
         <div className="ml-auto">
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => downloadCSV(filtered)}
             disabled={filtered.length === 0}

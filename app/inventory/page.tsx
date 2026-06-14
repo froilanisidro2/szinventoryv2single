@@ -14,7 +14,7 @@ import { useWarehouse } from '@/contexts/warehouse-context';
 import { fmtWarehouse, fmtSupplier } from '@/lib/warehouse-utils';
 
 export default function InventoryPage() {
-  const [inventory, setInventory] = useState<(Inventory & { productName: string; cost_price: number; selling_price: number; quantity_rejected: number; quantity_issued: number })[]>([]);
+  const [inventory, setInventory] = useState<(Inventory & { productName: string; cost_price: number; selling_price: number; quantity_rejected: number; quantity_scrapped: number; quantity_issued: number })[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
   const [supplierFilter, setSupplierFilter] = useState<string>('');
@@ -78,6 +78,7 @@ export default function InventoryPage() {
           quantity_allocated: stock.quantity_allocated || 0,
           quantity_available: stock.quantity_available || 0,
           quantity_rejected: stock.quantity_rejected || 0,
+          quantity_scrapped: stock.quantity_scrapped || 0,
           quantity_issued: issuedByProduct?.[stock.product_id] || 0,
           reorder_level: product.reorder_level || 50,
           reorder_quantity: product.reorder_quantity || 100,
@@ -103,6 +104,7 @@ export default function InventoryPage() {
           quantity_allocated: 0,
           quantity_available: 0,
           quantity_rejected: 0,
+          quantity_scrapped: 0,
           quantity_issued: issuedByProduct?.[product.id] || 0,
           reorder_level: product.reorder_level || 50,
           reorder_quantity: product.reorder_quantity || 100,
@@ -164,15 +166,16 @@ export default function InventoryPage() {
       }
 
       // Prepare CSV data
-      const headers = ['Product Name', 'Supplier', 'On Hand', 'Reserved', 'Available', 'Rejected', 'Issued', 'Reorder Level', 'Status', 'Cost (₱)', 'Value (₱)', 'Last Updated'];
+      const headers = ['Product Name', 'Supplier', 'On Hand', 'PO Rejected', 'Reserved', 'Scrapped', 'Available', 'Issued', 'Reorder Level', 'Status', 'Cost (₱)', 'Value (₱)', 'Last Updated'];
 
       const rows = (dataToExport as any[]).map((item) => [
         item.productName,
         supplierMap[item.supplier_id] || '—',
         item.quantity_on_hand,
-        item.quantity_allocated,
-        item.quantity_available,
         item.quantity_rejected,
+        item.quantity_allocated,
+        item.quantity_scrapped,
+        item.quantity_available,
         item.quantity_issued,
         item.reorder_level,
         item.quantity_available === 0 ? 'OUT OF STOCK' : item.quantity_available <= item.reorder_level ? 'LOW STOCK' : 'IN STOCK',
@@ -190,12 +193,14 @@ export default function InventoryPage() {
       // Add summary at the end
       const totalValue = dataToExport.reduce((sum, item) => sum + (item.quantity_on_hand * (item.cost_price || 0)), 0);
       const totalRejected = dataToExport.reduce((sum, item) => sum + item.quantity_rejected, 0);
-      
+      const totalScrapped = dataToExport.reduce((sum, item) => sum + item.quantity_scrapped, 0);
+
       csvContent += '\n\n';
       csvContent += `"INVENTORY SUMMARY",""` + '\n';
       csvContent += `"Total Items","${dataToExport.length}"` + '\n';
       csvContent += `"Total Stock Value (₱)","${totalValue.toFixed(2)}"` + '\n';
-      csvContent += `"Total Rejected Units","${totalRejected}"` + '\n';
+      csvContent += `"Total PO Rejected Units","${totalRejected}"` + '\n';
+      csvContent += `"Total Scrapped Units","${totalScrapped}"` + '\n';
       csvContent += `"Export Date","${new Date().toLocaleDateString('en-PH')}"` + '\n';
 
       // Create blob and download
@@ -278,6 +283,19 @@ export default function InventoryPage() {
       ),
     },
     {
+      key: 'quantity_rejected',
+      header: 'PO Rejected',
+      sortable: true,
+      render: (value) => (
+        <span
+          title="Units rejected during Goods Receipt (GRN). Use the Disposition button to return to supplier, scrap, or rework these items."
+          className={value > 0 ? 'bg-orange-100 px-2 py-1 rounded text-sm font-semibold text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 cursor-help' : 'cursor-help'}
+        >
+          {value}
+        </span>
+      ),
+    },
+    {
       key: 'quantity_allocated',
       header: 'Reserved',
       render: (value) => (
@@ -290,13 +308,13 @@ export default function InventoryPage() {
       ),
     },
     {
-      key: 'quantity_rejected',
-      header: 'Rejected',
+      key: 'quantity_scrapped',
+      header: 'Scrapped',
       sortable: true,
       render: (value) => (
         <span
-          title="Units rejected during Goods Receipt (GRN). Use the Disposition button to return to supplier, scrap, or rework these items."
-          className={value > 0 ? 'bg-orange-100 px-2 py-1 rounded text-sm font-semibold text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 cursor-help' : 'cursor-help'}
+          title="Units permanently written off via Disposition (Scrap)."
+          className={value > 0 ? 'bg-red-100 px-2 py-1 rounded text-sm font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-300 cursor-help' : 'text-gray-400 cursor-help'}
         >
           {value}
         </span>
@@ -771,12 +789,21 @@ export default function InventoryPage() {
                 </div>
                 <div>
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-gray-500 dark:text-gray-400">Rejected</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">PO Rejected</span>
                     <span className="text-sm font-bold text-orange-600">
                       {rejectedItems.reduce((sum, i) => sum + i.quantity_rejected, 0)}
                     </span>
                   </div>
                   <p className="text-xs text-gray-400 dark:text-gray-600 mt-0.5">{formatPeso(totalRejectedValue)} value · needs disposition</p>
+                </div>
+                <div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Scrapped</span>
+                    <span className="text-sm font-bold text-red-600">
+                      {inventory.reduce((sum, i) => sum + (i.quantity_scrapped || 0), 0)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 dark:text-gray-600 mt-0.5">Written off via disposition</p>
                 </div>
               </div>
             </div>

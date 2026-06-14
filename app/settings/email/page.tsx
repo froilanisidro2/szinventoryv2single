@@ -4,22 +4,12 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Mail, Save, Send, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { getCompanyEmailSettings, saveCompanyEmailSettings, markEmailSettingsVerified } from '@/app/actions';
 import { testSmtpConnection } from '@/app/actions/test-smtp';
 
 const INPUT_CLASS =
   'w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm';
-
-const COMMON_PRESETS = [
-  { label: 'Gmail', host: 'smtp.gmail.com', port: 587, secure: false },
-  { label: 'Gmail (SSL)', host: 'smtp.gmail.com', port: 465, secure: true },
-  { label: 'Outlook / Office 365', host: 'smtp.office365.com', port: 587, secure: false },
-  { label: 'Yahoo Mail', host: 'smtp.mail.yahoo.com', port: 587, secure: false },
-  { label: 'Zoho Mail', host: 'smtp.zoho.com', port: 587, secure: false },
-  { label: 'Custom', host: '', port: 587, secure: false },
-];
 
 export default function EmailSettingsPage() {
   const [companyId, setCompanyId] = useState('');
@@ -79,12 +69,6 @@ export default function EmailSettingsPage() {
       setIsLoading(false);
     }
   }, []);
-
-  const handlePreset = (preset: typeof COMMON_PRESETS[0]) => {
-    if (preset.host) {
-      setForm(f => ({ ...f, smtp_host: preset.host, smtp_port: preset.port, smtp_secure: preset.secure }));
-    }
-  };
 
   const handleSave = async () => {
     if (!companyId) { toast.error('Company not found'); return; }

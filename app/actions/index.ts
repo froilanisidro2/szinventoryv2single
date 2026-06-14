@@ -2634,9 +2634,10 @@ export async function processRejectionDisposition(
         break;
 
       case 'scrap':
-        // Items written off — reduce rejected quantity
+        // Items written off — reduce rejected quantity, track scrapped total
         updatePayload = {
           quantity_rejected: Math.max(0, (stockLevel.quantity_rejected || 0) - quantity),
+          quantity_scrapped: (stockLevel.quantity_scrapped || 0) + quantity,
         };
         transactionType = 'adjusted';
         break;
@@ -4077,6 +4078,16 @@ export async function getMaterialRequests(status?: string) {
   return { data: JSON.parse(JSON.stringify(Array.isArray(res.data) ? res.data : [])), error: null };
 }
 
+/** All Job Order MRF (BOM adjustment) requests across job orders, for the unified Material Requests list. */
+export async function getJobOrderMRFRequests(status?: string) {
+  const companyId = getCurrentUserCompanyId();
+  let url = `${API_ENDPOINTS.JOB_ORDER_BOM_REQUESTS}?company_id=eq.${companyId}&order=created_at.desc&select=*,product:products(id,name,sku),job_order:job_orders(id,jo_number,title)`;
+  if (status) url += `&status=eq.${status}`;
+  const res = await apiGet<any[]>(url);
+  if (res.error) return { data: [], error: res.error };
+  return { data: JSON.parse(JSON.stringify(Array.isArray(res.data) ? res.data : [])), error: null };
+}
+
 export async function getMaterialRequestById(id: string) {
   const companyId = getCurrentUserCompanyId();
   const res = await apiGet<any[]>(
@@ -4164,8 +4175,7 @@ export async function createMaterialRequest(
 ) {
   const companyId = getCurrentUserCompanyId();
   const userId = getCurrentUserId();
-  const now = new Date();
-  const mrfNumber = `MRF-${now.getFullYear()}-${String(now.getTime()).slice(-8)}`;
+  const mrfNumber = await generateDailyDocNumber(API_ENDPOINTS.MATERIAL_REQUESTS, 'mrf_number', 'PO-MRF', companyId);
 
   const headerRes = await apiPost<any>(API_ENDPOINTS.MATERIAL_REQUESTS, {
     company_id: companyId,
@@ -4291,10 +4301,12 @@ export async function createJobOrderBOMRequest(
 ) {
   const companyId = getCurrentUserCompanyId();
   const userId = getCurrentUserId();
+  const requestNumber = await generateDailyDocNumber(API_ENDPOINTS.JOB_ORDER_BOM_REQUESTS, 'request_number', 'JO-MRF', companyId);
   const res = await apiPost<any>(API_ENDPOINTS.JOB_ORDER_BOM_REQUESTS, {
     company_id: companyId,
     job_order_id: joId,
     job_order_bom_id: options?.jobOrderBomId || null,
+    request_number: requestNumber,
     product_id: productId,
     current_quantity: options?.currentQuantity ?? null,
     requested_quantity: requestedQuantity,
@@ -4586,8 +4598,8 @@ export async function issueMaterials(misId: string, receivedByUserId: string) {
       }
     }
 
-    // Deduct from stock_levels
-    await updateStockLevels(item.product_id, -item.quantity_issued, mis.warehouse_id);
+    // Deduct from stock_levels and release the matching reservation
+    await updateStockLevelAtomic(item.product_id, -item.quantity_issued, -item.quantity_issued, mis.warehouse_id);
 
     // Deduct from bin_stock if bin assigned
     if (item.bin_location_id) {

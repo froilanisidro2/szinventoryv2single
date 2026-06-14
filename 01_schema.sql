@@ -333,6 +333,8 @@ CREATE TABLE IF NOT EXISTS stock_levels (
     quantity_available INT GENERATED ALWAYS AS (quantity_on_hand - quantity_allocated) STORED,
     -- Rejected quantity tracking (migration 018)
     quantity_rejected INTEGER NOT NULL DEFAULT 0,
+    -- Scrapped quantity tracking (running total of items written off via disposition)
+    quantity_scrapped INTEGER NOT NULL DEFAULT 0,
     warehouse_location VARCHAR(255),
     -- Bin location tracking (migration 001)
     bin_location_id UUID REFERENCES bin_locations(id) ON DELETE SET NULL,
@@ -344,7 +346,8 @@ CREATE TABLE IF NOT EXISTS stock_levels (
     CONSTRAINT check_stock_levels_quantities CHECK (
         quantity_on_hand >= 0 AND
         quantity_allocated >= 0 AND
-        quantity_rejected >= 0
+        quantity_rejected >= 0 AND
+        quantity_scrapped >= 0
     )
 );
 
@@ -863,6 +866,8 @@ CREATE TABLE IF NOT EXISTS job_order_bom_requests (
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     job_order_id UUID NOT NULL REFERENCES job_orders(id) ON DELETE CASCADE,
     job_order_bom_id UUID REFERENCES job_order_bom(id) ON DELETE CASCADE,
+    -- MRF-style document number, e.g. JO-MRF-yymmdd-0001
+    request_number VARCHAR(50),
     product_id UUID NOT NULL REFERENCES products(id),
     current_quantity DECIMAL(15, 2),
     requested_quantity DECIMAL(15, 2) NOT NULL,

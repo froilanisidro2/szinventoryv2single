@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { Plus, ClipboardList, AlertCircle, Search, Download, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { getMaterialRequests, getCompanyUsers, updateMaterialRequestStatus } from '@/app/actions';
+import { getMaterialRequests, getJobOrderMRFRequests, getCompanyUsers, updateMaterialRequestStatus, cancelJobOrderBOMRequest } from '@/app/actions';
+import { getCurrentUser } from '@/lib/auth-utils';
 import type { MaterialRequest } from '@/types';
 
 const URGENCY_LABELS: Record<string, string> = {
@@ -38,17 +39,41 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400',
 };
 
+const TYPE_LABELS: Record<string, string> = {
+  procurement: 'Procurement',
+  jo_mrf: 'JO Adjustment',
+};
+
+const TYPE_COLORS: Record<string, string> = {
+  procurement: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
+  jo_mrf: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300',
+};
+
 const STATUS_TABS = ['all', 'draft', 'pending_approval', 'approved', 'rejected', 'cancelled'] as const;
 
-function downloadCSV(rows: MaterialRequest[], userMap: Record<string, string>) {
-  const headers = ['MRF #', 'Date', 'Requestor', 'Urgency', 'Status', 'Notes'];
+/** Unified row shape for both Procurement MRFs and Job Order MRF (BOM adjustment) requests. */
+interface UnifiedRow {
+  id: string;
+  type: 'procurement' | 'jo_mrf';
+  number: string;
+  created_at: string;
+  requestor_user_id?: string;
+  urgency_level?: string;
+  status: string;
+  detail: string;
+  job_order?: { id: string; jo_number: string; title: string };
+  raw: any;
+}
+
+function downloadCSV(rows: UnifiedRow[], userMap: Record<string, string>) {
+  const headers = ['MRF #', 'Type', 'Date', 'Requestor', 'Detail', 'Status'];
   const lines = rows.map(m => [
-    m.mrf_number,
+    m.number,
+    TYPE_LABELS[m.type],
     new Date(m.created_at).toLocaleDateString(),
     m.requestor_user_id ? (userMap[m.requestor_user_id] || '') : '',
-    URGENCY_LABELS[m.urgency_level] ?? m.urgency_level,
+    m.detail.replace(/,/g, ' '),
     STATUS_LABELS[m.status] ?? m.status,
-    (m.notes ?? '').replace(/,/g, ' '),
   ]);
   const csv = [headers, ...lines].map(r => r.join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -61,10 +86,13 @@ function downloadCSV(rows: MaterialRequest[], userMap: Record<string, string>) {
 }
 
 export default function MaterialRequestsPage() {
+  const currentUser = getCurrentUser();
   const [mrfs, setMrfs] = useState<MaterialRequest[]>([]);
+  const [joMrfs, setJoMrfs] = useState<any[]>([]);
   const [userMap, setUserMap] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState('');
   const [search, setSearch] = useState('');
   const [urgencyFilter, setUrgencyFilter] = useState('');
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -76,8 +104,9 @@ export default function MaterialRequestsPage() {
   async function loadData() {
     setIsLoading(true);
     try {
-      const [mrfsRes, usersRes] = await Promise.all([
+      const [mrfsRes, joMrfsRes, usersRes] = await Promise.all([
         getMaterialRequests(),
+        getJobOrderMRFRequests(),
         getCompanyUsers(),
       ]);
       if (mrfsRes.error) {
@@ -85,6 +114,7 @@ export default function MaterialRequestsPage() {
       } else {
         setMrfs(mrfsRes.data ?? []);
       }
+      if (!joMrfsRes.error) setJoMrfs(joMrfsRes.data ?? []);
       if (!usersRes.error) setUserMap(usersRes.data ?? {});
     } catch {
       toast.error('Error loading data');
@@ -93,31 +123,69 @@ export default function MaterialRequestsPage() {
     }
   }
 
+  const unified: UnifiedRow[] = useMemo(() => {
+    const procurement: UnifiedRow[] = mrfs.map(m => ({
+      id: m.id,
+      type: 'procurement',
+      number: m.mrf_number,
+      created_at: m.created_at,
+      requestor_user_id: m.requestor_user_id,
+      urgency_level: m.urgency_level,
+      status: m.status,
+      detail: m.job_order ? `from ${m.job_order.jo_number}` : (m.notes || '—'),
+      job_order: m.job_order,
+      raw: m,
+    }));
+    const joAdjustments: UnifiedRow[] = joMrfs.map((r: any) => ({
+      id: r.id,
+      type: 'jo_mrf',
+      number: r.request_number || '—',
+      created_at: r.created_at,
+      requestor_user_id: r.requested_by_user_id,
+      status: r.status,
+      detail: r.product?.name ? `${r.product.name} — qty ${Number(r.requested_quantity).toLocaleString()}` : '—',
+      job_order: r.job_order,
+      raw: r,
+    }));
+    return [...procurement, ...joAdjustments].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [mrfs, joMrfs]);
+
   const filtered = useMemo(() => {
-    let list = activeTab === 'all' ? mrfs : mrfs.filter(m => m.status === activeTab);
+    let list = activeTab === 'all' ? unified : unified.filter(m => m.status === activeTab);
+    if (typeFilter) list = list.filter(m => m.type === typeFilter);
     if (urgencyFilter) list = list.filter(m => m.urgency_level === urgencyFilter);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       list = list.filter(m =>
-        m.mrf_number.toLowerCase().includes(q) ||
+        m.number.toLowerCase().includes(q) ||
         (m.requestor_user_id && (userMap[m.requestor_user_id] || '').toLowerCase().includes(q))
       );
     }
     return list;
-  }, [mrfs, activeTab, urgencyFilter, search, userMap]);
+  }, [unified, activeTab, typeFilter, urgencyFilter, search, userMap]);
 
-  const hasActiveFilters = search || urgencyFilter;
+  const hasActiveFilters = search || urgencyFilter || typeFilter;
 
-  async function handleCancel(id: string) {
+  async function handleCancel(row: UnifiedRow) {
     if (!confirm('Cancel this material request?')) return;
-    setCancellingId(id);
+    setCancellingId(row.id);
     try {
-      const res = await updateMaterialRequestStatus(id, 'cancelled');
-      if (res.error) {
-        toast.error('Failed to cancel material request');
+      if (row.type === 'procurement') {
+        const res = await updateMaterialRequestStatus(row.id, 'cancelled');
+        if (res.error) {
+          toast.error('Failed to cancel material request');
+        } else {
+          toast.success('Material request cancelled');
+          setMrfs(prev => prev.map(m => m.id === row.id ? { ...m, status: 'cancelled' } : m));
+        }
       } else {
-        toast.success('Material request cancelled');
-        setMrfs(prev => prev.map(m => m.id === id ? { ...m, status: 'cancelled' } : m));
+        const res = await cancelJobOrderBOMRequest(row.id);
+        if (res.error) {
+          toast.error('Failed to cancel MRF');
+        } else {
+          toast.success('MRF cancelled');
+          setJoMrfs(prev => prev.filter(r => r.id !== row.id));
+        }
       }
     } catch {
       toast.error('Error cancelling material request');
@@ -134,7 +202,7 @@ export default function MaterialRequestsPage() {
           <ClipboardList className="h-6 w-6 text-gray-600 dark:text-gray-400" />
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Material Requests</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Raise and track Material Request Forms (MRF)</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Raise and track Material Request Forms (MRF) — procurement and Job Order BOM adjustments</p>
           </div>
         </div>
         <Link href="/material-requests/create">
@@ -160,7 +228,7 @@ export default function MaterialRequestsPage() {
             {tab === 'all' ? 'All' : STATUS_LABELS[tab]}
             {tab !== 'all' && (
               <span className="ml-1 text-xs text-gray-400">
-                ({mrfs.filter(m => m.status === tab).length})
+                ({unified.filter(m => m.status === tab).length})
               </span>
             )}
           </button>
@@ -189,6 +257,17 @@ export default function MaterialRequestsPage() {
         </div>
 
         <select
+          value={typeFilter}
+          onChange={e => setTypeFilter(e.target.value)}
+          className="py-2 px-3 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+        >
+          <option value="">All Types</option>
+          {Object.entries(TYPE_LABELS).map(([val, label]) => (
+            <option key={val} value={val}>{label}</option>
+          ))}
+        </select>
+
+        <select
           value={urgencyFilter}
           onChange={e => setUrgencyFilter(e.target.value)}
           className="py-2 px-3 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -201,7 +280,7 @@ export default function MaterialRequestsPage() {
 
         {hasActiveFilters && (
           <button
-            onClick={() => { setSearch(''); setUrgencyFilter(''); }}
+            onClick={() => { setSearch(''); setUrgencyFilter(''); setTypeFilter(''); }}
             className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 underline"
           >
             Clear filters
@@ -210,7 +289,7 @@ export default function MaterialRequestsPage() {
 
         <div className="ml-auto">
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => downloadCSV(filtered, userMap)}
             disabled={filtered.length === 0}
@@ -239,23 +318,24 @@ export default function MaterialRequestsPage() {
             <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">MRF #</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Type</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Date</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Requestor</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Urgency</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Detail</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Status</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {filtered.map(mrf => (
-                <tr key={mrf.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                <tr key={`${mrf.type}-${mrf.id}`} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                   <td className="px-4 py-3 font-mono font-medium text-gray-900 dark:text-white">
-                    {mrf.mrf_number}
-                    {mrf.job_order && (
-                      <div className="text-xs font-sans font-normal text-amber-600 dark:text-amber-400">
-                        from {mrf.job_order.jo_number}
-                      </div>
-                    )}
+                    {mrf.number}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLORS[mrf.type]}`}>
+                      {TYPE_LABELS[mrf.type]}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                     {new Date(mrf.created_at).toLocaleDateString()}
@@ -263,27 +343,42 @@ export default function MaterialRequestsPage() {
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                     {mrf.requestor_user_id ? (userMap[mrf.requestor_user_id] || '—') : '—'}
                   </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${URGENCY_COLORS[mrf.urgency_level]}`}>
-                      {URGENCY_LABELS[mrf.urgency_level]}
-                    </span>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                    {mrf.detail}
+                    {mrf.type === 'jo_mrf' && mrf.job_order && (
+                      <div className="text-xs font-mono text-amber-600 dark:text-amber-400">{mrf.job_order.jo_number}</div>
+                    )}
                   </td>
                   <td className="px-4 py-3">
+                    {mrf.urgency_level ? (
+                      <span className={`mr-1 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${URGENCY_COLORS[mrf.urgency_level]}`}>
+                        {URGENCY_LABELS[mrf.urgency_level]}
+                      </span>
+                    ) : null}
                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[mrf.status]}`}>
-                      {STATUS_LABELS[mrf.status]}
+                      {STATUS_LABELS[mrf.status] ?? mrf.status}
                     </span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <Link
-                        href={`/material-requests/${mrf.id}`}
+                        href={mrf.type === 'procurement' ? `/material-requests/${mrf.id}` : `/job-orders/${mrf.job_order?.id}?tab=bomRequests`}
                         className="text-primary-600 hover:underline dark:text-primary-400 text-xs font-medium"
                       >
                         View
                       </Link>
-                      {(mrf.status === 'draft' || mrf.status === 'pending_approval') && (
+                      {mrf.status === 'pending_approval' && (mrf.type === 'procurement' || mrf.requestor_user_id === currentUser?.id) && (
                         <button
-                          onClick={() => handleCancel(mrf.id)}
+                          onClick={() => handleCancel(mrf)}
+                          disabled={cancellingId === mrf.id}
+                          className="text-red-600 hover:underline dark:text-red-400 text-xs font-medium disabled:opacity-50"
+                        >
+                          {cancellingId === mrf.id ? 'Cancelling...' : 'Cancel'}
+                        </button>
+                      )}
+                      {mrf.type === 'procurement' && mrf.status === 'draft' && (
+                        <button
+                          onClick={() => handleCancel(mrf)}
                           disabled={cancellingId === mrf.id}
                           className="text-red-600 hover:underline dark:text-red-400 text-xs font-medium disabled:opacity-50"
                         >

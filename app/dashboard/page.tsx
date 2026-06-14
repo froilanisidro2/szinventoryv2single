@@ -5,7 +5,7 @@ import { fmtWarehouse } from '@/lib/warehouse-utils';
 import Link from 'next/link';
 import {
   Package, FileText, AlertCircle, Clock, ShoppingCart,
-  ArrowRight, TrendingUp, CheckCircle, XCircle, Hammer,
+  ArrowRight, CheckCircle, XCircle, Hammer,
   BarChart3, Warehouse,
 } from 'lucide-react';
 import {
@@ -136,8 +136,6 @@ export default function DashboardPage() {
   // All invoices (PO + SO) — recent 5
   const recentInvoices = invoices.slice(0, 5);
 
-  // Active/pending invoices (non-draft, non-cancelled)
-  const activeInvoices = invoices.filter(i => !['draft', 'cancelled'].includes(i.status));
   const overdueInvoices = invoices.filter(i => i.status === 'overdue');
 
   // Total invoiced value (paid + partially_paid)

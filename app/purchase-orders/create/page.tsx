@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, ShoppingCart } from 'lucide-react';
 import Link from 'next/link';
@@ -32,6 +32,14 @@ interface POFormData {
 }
 
 export default function CreatePOPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-20 text-gray-500">Loading…</div>}>
+      <CreatePOForm />
+    </Suspense>
+  );
+}
+
+function CreatePOForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mrfId = searchParams.get('mrf_id');

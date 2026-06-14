@@ -27,6 +27,8 @@ interface Supplier {
   name: string;
   email?: string;
   contact_person?: string;
+  vat_type?: 'vat' | 'non_vat';
+  vat_rate?: number | null;
 }
 
 export default function PurchaseOrderDetailPage() {
