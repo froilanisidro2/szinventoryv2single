@@ -80,6 +80,7 @@ export default function ReceiveGoodsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [receivedItems, setReceivedItems] = useState<Record<string, ReceivedItem>>({});
+  const [receivedDate, setReceivedDate] = useState(() => new Date().toISOString().split('T')[0]);
 
   useEffect(() => { loadData(); }, [id]);
 
@@ -291,7 +292,7 @@ export default function ReceiveGoodsPage() {
               product_id: group.productId,
               transaction_type: 'inbound',
               quantity: received.quantityAccepted,
-              notes: `Received from PO ${po.po_number}${received.track_batches ? ` [Batch: ${received.batch_number}]` : ''}${received.qcNotes ? ` — ${received.qcNotes}` : ''}`,
+              notes: `Received from PO ${po.po_number} on ${receivedDate}${received.track_batches ? ` [Batch: ${received.batch_number}]` : ''}${received.qcNotes ? ` — ${received.qcNotes}` : ''}`,
               reference_id: po.id,
               reference_type: 'purchase_order',
               warehouse_id: received.warehouseId,
@@ -409,6 +410,17 @@ export default function ReceiveGoodsPage() {
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-2 flex items-center gap-3 text-sm text-blue-800 dark:text-blue-300">
         <Warehouse className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
         <span><strong>Putaway:</strong> Each item defaults to its product&apos;s configured warehouse/bin. Change the dropdowns to override per-item if needed.</span>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Date Received</label>
+        <input
+          type="date"
+          value={receivedDate}
+          onChange={(e) => setReceivedDate(e.target.value)}
+          disabled={isSubmitting}
+          className="px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+        />
       </div>
 
       <div className="card divide-y divide-gray-200 dark:divide-gray-700">

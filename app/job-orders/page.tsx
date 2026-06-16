@@ -40,16 +40,17 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 
-const STATUS_TABS = ['all', 'pending_approval', 'approved', 'in_progress', 'completed'] as const;
+const STATUS_OPTIONS = ['all', 'pending_approval', 'approved', 'in_progress', 'completed'] as const;
 
 function downloadCSV(rows: JobOrder[]) {
-  const headers = ['JO #', 'Title', 'Priority', 'Status', 'Production Lead', 'Target Date'];
+  const headers = ['JO #', 'Title', 'Priority', 'Status', 'Production Lead', 'Start Date', 'Target Date'];
   const lines = rows.map(j => [
     j.jo_number,
     `"${(j.title ?? '').replace(/"/g, '""')}"`,
     PRIORITY_LABELS[j.priority] ?? j.priority,
     STATUS_LABELS[j.status] ?? j.status,
     j.production_lead ?? '',
+    j.start_date ? new Date(j.start_date).toLocaleDateString() : '',
     j.target_completion_date ? new Date(j.target_completion_date).toLocaleDateString() : '',
   ]);
   const csv = [headers, ...lines].map(r => r.join(',')).join('\n');
@@ -65,7 +66,7 @@ function downloadCSV(rows: JobOrder[]) {
 export default function JobOrdersPage() {
   const [jobs, setJobs] = useState<JobOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
 
@@ -87,7 +88,7 @@ export default function JobOrdersPage() {
   }
 
   const filtered = useMemo(() => {
-    let list = activeTab === 'all' ? jobs : jobs.filter(j => j.status === activeTab);
+    let list = statusFilter === 'all' ? jobs : jobs.filter(j => j.status === statusFilter);
     if (priorityFilter) list = list.filter(j => j.priority === priorityFilter);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -98,9 +99,9 @@ export default function JobOrdersPage() {
       );
     }
     return list;
-  }, [jobs, activeTab, priorityFilter, search]);
+  }, [jobs, statusFilter, priorityFilter, search]);
 
-  const hasActiveFilters = search || priorityFilter;
+  const hasActiveFilters = search || priorityFilter || statusFilter !== 'all';
 
   return (
     <div className="flex-1 space-y-4 p-6">
@@ -118,28 +119,6 @@ export default function JobOrdersPage() {
             New Job Order
           </Button>
         </Link>
-      </div>
-
-      {/* Status tabs */}
-      <div className="flex gap-1 border-b border-gray-200 dark:border-gray-700">
-        {STATUS_TABS.map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-              activeTab === tab
-                ? 'border-b-2 border-primary-600 text-primary-600 dark:text-primary-400'
-                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-            }`}
-          >
-            {tab === 'all' ? 'All' : STATUS_LABELS[tab]}
-            {tab !== 'all' && (
-              <span className="ml-1 text-xs text-gray-400">
-                ({jobs.filter(j => j.status === tab).length})
-              </span>
-            )}
-          </button>
-        ))}
       </div>
 
       {/* Search + Filter + CSV */}
@@ -164,6 +143,18 @@ export default function JobOrdersPage() {
         </div>
 
         <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          className="py-2 px-3 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+        >
+          {STATUS_OPTIONS.map(opt => (
+            <option key={opt} value={opt}>
+              {opt === 'all' ? 'All Statuses' : STATUS_LABELS[opt]}
+            </option>
+          ))}
+        </select>
+
+        <select
           value={priorityFilter}
           onChange={e => setPriorityFilter(e.target.value)}
           className="py-2 px-3 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -176,7 +167,7 @@ export default function JobOrdersPage() {
 
         {hasActiveFilters && (
           <button
-            onClick={() => { setSearch(''); setPriorityFilter(''); }}
+            onClick={() => { setSearch(''); setPriorityFilter(''); setStatusFilter('all'); }}
             className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 underline"
           >
             Clear filters
@@ -217,6 +208,7 @@ export default function JobOrdersPage() {
                 <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Priority</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Status</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Production Lead</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Start Date</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Target Date</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Actions</th>
               </tr>
@@ -242,6 +234,11 @@ export default function JobOrdersPage() {
                   </td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
                     {job.production_lead || '—'}
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
+                    {job.start_date
+                      ? new Date(job.start_date).toLocaleDateString()
+                      : '—'}
                   </td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
                     {job.target_completion_date

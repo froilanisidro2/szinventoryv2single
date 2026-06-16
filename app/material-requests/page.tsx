@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Plus, ClipboardList, AlertCircle, Search, Download, X } from 'lucide-react';
+import { ClipboardList, AlertCircle, Search, Download, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getMaterialRequests, getJobOrderMRFRequests, getCompanyUsers, updateMaterialRequestStatus, cancelJobOrderBOMRequest } from '@/app/actions';
@@ -49,7 +49,7 @@ const TYPE_COLORS: Record<string, string> = {
   jo_mrf: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300',
 };
 
-const STATUS_TABS = ['all', 'draft', 'pending_approval', 'approved', 'rejected', 'cancelled'] as const;
+const STATUS_OPTIONS = ['all', 'draft', 'pending_approval', 'approved', 'rejected', 'cancelled'] as const;
 
 /** Unified row shape for both Procurement MRFs and Job Order MRF (BOM adjustment) requests. */
 interface UnifiedRow {
@@ -91,7 +91,7 @@ export default function MaterialRequestsPage() {
   const [joMrfs, setJoMrfs] = useState<any[]>([]);
   const [userMap, setUserMap] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState('');
   const [search, setSearch] = useState('');
   const [urgencyFilter, setUrgencyFilter] = useState('');
@@ -151,7 +151,7 @@ export default function MaterialRequestsPage() {
   }, [mrfs, joMrfs]);
 
   const filtered = useMemo(() => {
-    let list = activeTab === 'all' ? unified : unified.filter(m => m.status === activeTab);
+    let list = statusFilter === 'all' ? unified : unified.filter(m => m.status === statusFilter);
     if (typeFilter) list = list.filter(m => m.type === typeFilter);
     if (urgencyFilter) list = list.filter(m => m.urgency_level === urgencyFilter);
     if (search.trim()) {
@@ -162,9 +162,9 @@ export default function MaterialRequestsPage() {
       );
     }
     return list;
-  }, [unified, activeTab, typeFilter, urgencyFilter, search, userMap]);
+  }, [unified, statusFilter, typeFilter, urgencyFilter, search, userMap]);
 
-  const hasActiveFilters = search || urgencyFilter || typeFilter;
+  const hasActiveFilters = search || urgencyFilter || typeFilter || statusFilter !== 'all';
 
   async function handleCancel(row: UnifiedRow) {
     if (!confirm('Cancel this material request?')) return;
@@ -205,34 +205,6 @@ export default function MaterialRequestsPage() {
             <p className="text-sm text-gray-500 dark:text-gray-400">Raise and track Material Request Forms (MRF) — procurement and Job Order BOM adjustments</p>
           </div>
         </div>
-        <Link href="/material-requests/create">
-          <Button className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            New Request
-          </Button>
-        </Link>
-      </div>
-
-      {/* Status tabs */}
-      <div className="flex gap-1 border-b border-gray-200 dark:border-gray-700">
-        {STATUS_TABS.map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-medium capitalize rounded-t-lg transition-colors ${
-              activeTab === tab
-                ? 'border-b-2 border-primary-600 text-primary-600 dark:text-primary-400'
-                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-            }`}
-          >
-            {tab === 'all' ? 'All' : STATUS_LABELS[tab]}
-            {tab !== 'all' && (
-              <span className="ml-1 text-xs text-gray-400">
-                ({unified.filter(m => m.status === tab).length})
-              </span>
-            )}
-          </button>
-        ))}
       </div>
 
       {/* Search + Filter + CSV */}
@@ -255,6 +227,18 @@ export default function MaterialRequestsPage() {
             </button>
           )}
         </div>
+
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          className="py-2 px-3 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+        >
+          {STATUS_OPTIONS.map(opt => (
+            <option key={opt} value={opt}>
+              {opt === 'all' ? 'All Statuses' : STATUS_LABELS[opt]}
+            </option>
+          ))}
+        </select>
 
         <select
           value={typeFilter}
@@ -280,7 +264,7 @@ export default function MaterialRequestsPage() {
 
         {hasActiveFilters && (
           <button
-            onClick={() => { setSearch(''); setUrgencyFilter(''); setTypeFilter(''); }}
+            onClick={() => { setSearch(''); setUrgencyFilter(''); setTypeFilter(''); setStatusFilter('all'); }}
             className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 underline"
           >
             Clear filters
