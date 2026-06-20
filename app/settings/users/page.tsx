@@ -7,10 +7,10 @@ import {
   Pencil, KeyRound, Eye, EyeOff, Copy,
 } from 'lucide-react';
 import { fmtCode } from '@/lib/warehouse-utils';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { getCurrentUser, logout } from '@/lib/auth-utils';
+import { logout } from '@/lib/auth-utils';
+import { useCurrentUser } from '@/lib/use-current-user';
 import { fmtWarehouse } from '@/lib/warehouse-utils';
 import {
   getUsersByCompany, createCompanyAdmin, toggleUserStatus, deleteUserPermanently,
@@ -27,6 +27,7 @@ interface CompanyUser {
   phone?: string;
   role?: string;
   role_id?: string;
+  roles?: { name: string };
   status: string;
   is_company_admin: boolean;
   created_at: string;
@@ -36,8 +37,11 @@ interface Role { id: string; name: string; description?: string; }
 interface WarehouseItem { id: string; name: string; }
 
 export default function UsersPage() {
-  const currentUser = getCurrentUser();
+  const currentUser = useCurrentUser();
   const isAdmin = currentUser?.isCompanyAdmin || currentUser?.role === 'admin';
+  // BackOffice can manage non-admin users; only admins can manage other admins
+  const canManage = (target: CompanyUser) =>
+    isAdmin || !target.is_company_admin;
 
   const [users, setUsers]         = useState<CompanyUser[]>([]);
   const [roles, setRoles]         = useState<Role[]>([]);
@@ -80,6 +84,8 @@ export default function UsersPage() {
   const [showNewPw, setShowNewPw]             = useState(false);
   const [showConfirmPw, setShowConfirmPw]     = useState(false);
   const [pwErrors, setPwErrors]               = useState<Record<string, string>>({});
+  const [showCreatePw, setShowCreatePw]       = useState(false);
+  const [showCreateConfirmPw, setShowCreateConfirmPw] = useState(false);
 
   const [company, setCompany]               = useState<any>(null);
   const [isLimitReached, setIsLimitReached] = useState(false);
@@ -125,9 +131,10 @@ export default function UsersPage() {
   }, [currentUser?.companyId]);
 
   useEffect(() => {
-    if (!currentUser?.companyId) { toast.error('Company information not found'); logout(); return; }
+    if (currentUser === null) return;
+    if (!currentUser.companyId) { toast.error('Company information not found'); logout(); return; }
     loadAll();
-  }, [loadAll, currentUser?.companyId]);
+  }, [loadAll, currentUser]);
 
   /* ---- helpers ---- */
   const whName = (id: string) => warehouses.find((w) => w.id === id)?.name ?? id;
@@ -303,6 +310,8 @@ export default function UsersPage() {
       }
       toast.success('User created successfully!');
       setFormData({ first_name: '', last_name: '', email: '', phone: '', password: '', confirmPassword: '', role_id: '', warehouse_ids: [] });
+      setShowCreatePw(false);
+      setShowCreateConfirmPw(false);
       setShowAddForm(false);
       loadAll();
     } finally { setIsSaving(false); }
@@ -321,9 +330,8 @@ export default function UsersPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link href="/settings">
-          <Button variant="secondary" size="sm"><ArrowLeft className="h-4 w-4" />Back</Button>
-        </Link>
+        
+          <Button href="/settings" variant="secondary" size="sm"><ArrowLeft className="h-4 w-4" />Back</Button>
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <Users className="h-6 w-6 text-primary-600" />Users Management
@@ -427,20 +435,45 @@ export default function UsersPage() {
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {(['password', 'confirmPassword'] as const).map((field) => (
-                <div key={field}>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    {field === 'password' ? 'Password *' : 'Confirm Password *'}
-                  </label>
-                  <input type="password" name={field} value={formData[field]} onChange={handleChange}
-                    className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 ${errors[field] ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
-                    placeholder="••••••••" />
-                  {errors[field] && <p className="text-red-600 text-sm mt-1">{errors[field]}</p>}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password *</label>
+                <div className="relative">
+                  <input
+                    type={showCreatePw ? 'text' : 'password'}
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    className={`w-full px-4 py-2 pr-10 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 ${errors.password ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+                    placeholder="••••••••"
+                  />
+                  <button type="button" onClick={() => setShowCreatePw((p) => !p)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    {showCreatePw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
-              ))}
+                {errors.password && <p className="text-red-600 text-sm mt-1">{errors.password}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Confirm Password *</label>
+                <div className="relative">
+                  <input
+                    type={showCreateConfirmPw ? 'text' : 'password'}
+                    name="confirmPassword"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    className={`w-full px-4 py-2 pr-10 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 ${errors.confirmPassword ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+                    placeholder="••••••••"
+                  />
+                  <button type="button" onClick={() => setShowCreateConfirmPw((p) => !p)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    {showCreateConfirmPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {errors.confirmPassword && <p className="text-red-600 text-sm mt-1">{errors.confirmPassword}</p>}
+              </div>
             </div>
             <div className="flex gap-4 pt-2">
-              <Button type="button" variant="ghost" onClick={() => { setShowAddForm(false); setErrors({}); }}>Cancel</Button>
+              <Button type="button" variant="ghost" onClick={() => { setShowAddForm(false); setErrors({}); setShowCreatePw(false); setShowCreateConfirmPw(false); }}>Cancel</Button>
               <button type="submit" disabled={isSaving} className="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg disabled:opacity-50">
                 {isSaving ? 'Creating…' : 'Create User'}
               </button>
@@ -506,9 +539,23 @@ export default function UsersPage() {
                           : <span className="text-gray-400">—</span>}
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${u.is_company_admin ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-400'}`}>
-                          {u.is_company_admin ? 'Admin' : (u.role ? u.role.charAt(0).toUpperCase() + u.role.slice(1) : 'User')}
-                        </span>
+                        {(() => {
+                          const roleName = u.is_company_admin
+                            ? 'Admin'
+                            : (u.roles?.name || u.role || 'User');
+                          const isAdminRole = u.is_company_admin || roleName.toLowerCase() === 'admin';
+                          const isManagerRole = ['manager', 'backoffice'].includes(roleName.toLowerCase());
+                          const colorClass = isAdminRole
+                            ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                            : isManagerRole
+                            ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400';
+                          return (
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${colorClass}`}>
+                              {roleName}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-6 py-4">
                         {assignedIds.length === 0
@@ -540,8 +587,7 @@ export default function UsersPage() {
                           </button>
                           {openDropdown === u.id && (
                             <div className="absolute right-0 mt-8 w-52 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl shadow-lg z-20 overflow-hidden">
-                              {/* Admin-only actions */}
-                              {isAdmin && (
+                              {canManage(u) ? (
                                 <>
                                   <button onClick={() => openEditModal(u)}
                                     className="w-full text-left px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
@@ -552,24 +598,24 @@ export default function UsersPage() {
                                     <KeyRound className="h-4 w-4 text-amber-500" />Reset Password
                                   </button>
                                   <div className="border-t border-gray-200 dark:border-gray-600" />
-                                </>
-                              )}
-                              <button onClick={() => openWhModal(u)}
-                                className="w-full text-left px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                                <Warehouse className="h-4 w-4 text-primary-500" />Assign Warehouses
-                              </button>
-                              <button onClick={() => { setSelectedUser(u); setShowSuspendModal(true); setOpenDropdown(null); }}
-                                className="w-full text-left px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                                <AlertTriangle className="h-4 w-4" />{u.status === 'active' ? 'Suspend User' : 'Reactivate User'}
-                              </button>
-                              {isAdmin && (
-                                <>
+                                  <button onClick={() => openWhModal(u)}
+                                    className="w-full text-left px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                    <Warehouse className="h-4 w-4 text-primary-500" />Assign Warehouses
+                                  </button>
+                                  <button onClick={() => { setSelectedUser(u); setShowSuspendModal(true); setOpenDropdown(null); }}
+                                    className="w-full text-left px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                    <AlertTriangle className="h-4 w-4" />{u.status === 'active' ? 'Suspend User' : 'Reactivate User'}
+                                  </button>
                                   <div className="border-t border-gray-200 dark:border-gray-600" />
                                   <button onClick={() => { setSelectedUser(u); setShowDeleteModal(true); setOpenDropdown(null); }}
                                     className="w-full text-left px-4 py-2.5 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
                                     <Trash2 className="h-4 w-4" />Delete User
                                   </button>
                                 </>
+                              ) : (
+                                <div className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500 italic">
+                                  Cannot modify admin accounts
+                                </div>
                               )}
                             </div>
                           )}

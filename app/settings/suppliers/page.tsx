@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, ArrowLeft, Search, Upload, Copy, Check } from 'lucide-react';
 import { fmtCode } from '@/lib/warehouse-utils';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { BulkUploadModal } from '@/components/bulk-upload-modal';
@@ -173,12 +172,11 @@ export default function SuppliersPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/settings">
-            <Button variant="secondary" size="sm">
+          
+            <Button href="/settings" variant="secondary" size="sm">
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
-          </Link>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Suppliers Management</h1>
             <p className="text-gray-600 dark:text-gray-400">Create and manage supplier information</p>

@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, Users, BarChart3, AlertCircle } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getCompanyById } from '@/app/actions';
@@ -69,12 +68,11 @@ export default function CompanyDetailPage() {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <div className="px-4 py-6 md:px-6 max-w-4xl mx-auto">
-          <Link href="/superadmin">
-            <Button variant="ghost" size="sm" className="gap-2 mb-4">
+          
+            <Button href="/superadmin" variant="ghost" size="sm" className="gap-2 mb-4">
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
-          </Link>
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
             <div>
@@ -110,12 +108,11 @@ export default function CompanyDetailPage() {
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="px-4 py-4 md:px-6">
-          <Link href="/superadmin">
-            <Button variant="ghost" size="sm" className="gap-2 mb-4">
+          
+            <Button href="/superadmin" variant="ghost" size="sm" className="gap-2 mb-4">
               <ArrowLeft className="h-4 w-4" />
               Back to Companies
             </Button>
-          </Link>
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{company.name}</h1>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{company.email}</p>
@@ -244,16 +241,13 @@ export default function CompanyDetailPage() {
 
           {/* Actions */}
           <div className="flex gap-3">
-            <Link href={`/superadmin/companies/${company.id}/users`} className="flex-1">
-              <Button variant="primary" className="w-full">
+            <Button href={`/superadmin/companies/${company.id}/users`} className="flex-1 w-full" variant="primary">
                 Manage Users
               </Button>
-            </Link>
-            <Link href="/superadmin" className="flex-1">
-              <Button variant="ghost" className="w-full">
+            
+              <Button href="/superadmin" className="flex-1 w-full" variant="ghost">
                 Back
               </Button>
-            </Link>
           </div>
         </div>
       </main>

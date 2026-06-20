@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, ArrowLeft, Search } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -42,12 +41,11 @@ export default function ProductsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/settings">
-          <Button variant="secondary" size="sm">
+        
+          <Button href="/settings" variant="secondary" size="sm">
             <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
-        </Link>
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Products</h1>
           <p className="text-gray-600 dark:text-gray-400">Manage product catalog and inventory</p>

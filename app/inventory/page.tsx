@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Search, Zap, Download } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Search, Zap, Download, Upload, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
@@ -9,9 +9,24 @@ import { DataTable, Column } from '@/components/ui/data-table';
 import { RejectionDispositionModal } from '@/components/forms/rejection-disposition-modal';
 import { toast } from 'sonner';
 import type { Inventory } from '@/types';
-import { getStockLevels, getProducts, processRejectionDisposition, getIssuedTotals, getProductMRFRequests, getProductMISItems, getProductPOReceipts, getOldestUnconsumedStockDate, getSuppliers } from '@/app/actions';
+import { getStockLevels, getProducts, processRejectionDisposition, getIssuedTotals, getProductMRFRequests, getProductMISItems, getProductPOReceipts, getOldestUnconsumedStockDate, getSuppliers, getProductBySku, createStockTransaction, updateStockLevels } from '@/app/actions';
 import { useWarehouse } from '@/contexts/warehouse-context';
 import { fmtWarehouse, fmtSupplier } from '@/lib/warehouse-utils';
+import { useCurrentUser } from '@/lib/use-current-user';
+
+interface BulkRow {
+  sku: string;
+  productName: string;
+  onHand: number;
+  issued: number;
+  date: string;
+}
+
+interface BulkRowResult {
+  sku: string;
+  status: 'success' | 'skipped' | 'error';
+  message: string;
+}
 
 export default function InventoryPage() {
   const [inventory, setInventory] = useState<(Inventory & { productName: string; cost_price: number; selling_price: number; quantity_rejected: number; quantity_scrapped: number; quantity_issued: number })[]>([]);
@@ -36,6 +51,17 @@ export default function InventoryPage() {
   const [txDateFrom, setTxDateFrom] = useState('');
   const [txDateTo, setTxDateTo] = useState('');
   const { warehouses, selectedWarehouseId } = useWarehouse();
+  const currentUser = useCurrentUser();
+  const isAdmin = currentUser?.isCompanyAdmin ?? false;
+
+  // Bulk import state
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [bulkFileName, setBulkFileName] = useState('');
+  const [bulkRows, setBulkRows] = useState<BulkRow[]>([]);
+  const [bulkErrors, setBulkErrors] = useState<string[]>([]);
+  const [bulkResults, setBulkResults] = useState<BulkRowResult[]>([]);
+  const [isBulkImporting, setIsBulkImporting] = useState(false);
+  const bulkFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadInventory();
@@ -86,6 +112,7 @@ export default function InventoryPage() {
           selling_price: product.selling_price || 0,
           last_stock_date: stock.updated_at ? new Date(stock.updated_at) : new Date(),
           productName: product.name || 'Unknown Product',
+          sku: product.sku || '',
           supplier_id: product.supplier_id || null,
           createdAt: new Date(stock.created_at),
           updatedAt: new Date(stock.updated_at),
@@ -112,6 +139,7 @@ export default function InventoryPage() {
           selling_price: product.selling_price || 0,
           last_stock_date: new Date(product.updated_at || product.created_at),
           productName: product.name || 'Unknown Product',
+          sku: product.sku || '',
           supplier_id: product.supplier_id || null,
           createdAt: new Date(product.created_at),
           updatedAt: new Date(product.updated_at || product.created_at),
@@ -154,6 +182,129 @@ export default function InventoryPage() {
       console.error('Error processing disposition:', error);
       throw error;
     }
+  };
+
+  const handleBulkFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBulkFileName(file.name);
+    setBulkErrors([]);
+    setBulkResults([]);
+    setBulkRows([]);
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const text = ev.target?.result as string;
+        const rows = text.split('\n').slice(1);
+        const parsed: BulkRow[] = [];
+        const errs: string[] = [];
+
+        rows.forEach((row, idx) => {
+          if (!row.trim()) return;
+          const cols = row.split(',').map(s => s.trim());
+          const [sku, productName, onHandStr, issuedStr, date] = cols;
+          if (!sku) { errs.push(`Row ${idx + 2}: SKU is required`); return; }
+          if (!date) { errs.push(`Row ${idx + 2}: Date is required`); return; }
+          const onHand = parseFloat(onHandStr ?? '0') || 0;
+          const issued = parseFloat(issuedStr ?? '0') || 0;
+          if (onHand < 0) { errs.push(`Row ${idx + 2}: On Hand cannot be negative`); return; }
+          if (issued < 0) { errs.push(`Row ${idx + 2}: Issued cannot be negative`); return; }
+          parsed.push({ sku, productName: productName || sku, onHand, issued, date });
+        });
+
+        setBulkRows(parsed);
+        setBulkErrors(errs);
+      } catch {
+        setBulkErrors(['Error parsing file. Please ensure it is a valid CSV.']);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleBulkImport = async () => {
+    if (bulkRows.length === 0) { setBulkErrors(['No items to import']); return; }
+    setIsBulkImporting(true);
+    setBulkResults([]);
+    const results: BulkRowResult[] = [];
+    const wh = selectedWarehouseId || undefined;
+
+    for (const row of bulkRows) {
+      try {
+        const productRes = await getProductBySku(row.sku);
+        if (productRes.error || !productRes.data) {
+          results.push({ sku: row.sku, status: 'skipped', message: `SKU "${row.sku}" not found in product list — skipped` });
+          continue;
+        }
+        const product = productRes.data;
+
+        if (row.onHand > 0) {
+          await createStockTransaction({
+            product_id: product.id,
+            warehouse_id: wh,
+            transaction_type: 'opening_balance',
+            quantity: row.onHand,
+            notes: `Bulk import — On Hand | Date: ${row.date}`,
+            reference_type: 'opening_balance',
+          });
+          await updateStockLevels(product.id, row.onHand, wh);
+        }
+
+        if (row.issued > 0) {
+          await createStockTransaction({
+            product_id: product.id,
+            warehouse_id: wh,
+            transaction_type: 'sale',
+            quantity: row.issued,
+            notes: `Bulk import — Issued | Date: ${row.date}`,
+            reference_type: 'bulk_outbound',
+          });
+          await updateStockLevels(product.id, -row.issued, wh);
+        }
+
+        const parts: string[] = [];
+        if (row.onHand > 0) parts.push(`+${row.onHand} on hand`);
+        if (row.issued > 0) parts.push(`-${row.issued} issued`);
+        results.push({ sku: row.sku, status: 'success', message: parts.join(', ') || 'No qty change' });
+      } catch (err) {
+        results.push({ sku: row.sku, status: 'error', message: err instanceof Error ? err.message : 'Unknown error' });
+      }
+    }
+
+    setBulkResults(results);
+    setIsBulkImporting(false);
+
+    const successCount = results.filter(r => r.status === 'success').length;
+    const skippedCount = results.filter(r => r.status === 'skipped').length;
+    const failCount = results.filter(r => r.status === 'error').length;
+
+    if (failCount === 0 && skippedCount === 0) {
+      toast.success(`All ${successCount} items imported successfully!`);
+    } else if (failCount === 0) {
+      toast.success(`${successCount} imported, ${skippedCount} skipped (not in product list)`);
+    } else {
+      toast.error(`${failCount} error(s) — ${successCount} succeeded, ${skippedCount} skipped`);
+    }
+
+    await loadInventory();
+  };
+
+  const handleBulkModalClose = () => {
+    setIsBulkImportOpen(false);
+    setBulkFileName('');
+    setBulkRows([]);
+    setBulkErrors([]);
+    setBulkResults([]);
+    if (bulkFileRef.current) bulkFileRef.current.value = '';
+  };
+
+  const downloadBulkTemplate = () => {
+    const csv = 'SKU,Product Name,On Hand,Issued,Date\nCAB-007,Cabinet Shelf Pin 5mm,100,0,2026-06-20\nPROD-001,Laptop Pro 15,0,20,2026-06-20';
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'bulk-import-template.csv';
+    link.click();
   };
 
   const handleDownloadInventory = () => {
@@ -266,12 +417,13 @@ export default function InventoryPage() {
       key: 'productName',
       header: 'Product',
       sortable: true,
+      width: '220px',
     },
     {
-      key: 'warehouse_id',
-      header: 'Warehouse',
+      key: 'sku',
+      header: 'SKU',
       render: (value) => value
-        ? <span className="text-sm text-gray-700 dark:text-gray-300">{warehouseMap[value] || value.slice(0, 8)}</span>
+        ? <span className="font-mono text-xs text-gray-700 dark:text-gray-300">{value}</span>
         : <span className="text-xs text-gray-400">—</span>,
     },
     {
@@ -404,6 +556,11 @@ export default function InventoryPage() {
           <Button variant="secondary" icon={<Download className="h-4 w-4" />} onClick={handleDownloadInventory} className="gap-2">
             CSV
           </Button>
+          {isAdmin && (
+            <Button variant="primary" icon={<Upload className="h-4 w-4" />} onClick={() => setIsBulkImportOpen(true)} className="gap-2">
+              Import
+            </Button>
+          )}
         </div>
       </div>
 
@@ -811,6 +968,167 @@ export default function InventoryPage() {
         </div>
 
       </div>{/* end two-column flex */}
+
+      {/* Bulk Import Modal */}
+      <Modal
+        isOpen={isBulkImportOpen}
+        onClose={handleBulkModalClose}
+        title="Import"
+        size="3xl"
+      >
+        <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+          {/* Info banner */}
+          <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 text-sm text-blue-800 dark:text-blue-300">
+            Upload a CSV to set <strong>On Hand</strong> stock and record <strong>Issued</strong> quantities. Unit cost is fetched automatically from each product. Only SKUs that exist in your product list will be imported — others are skipped. <strong>Date</strong> is the effective date of the stock movement (e.g. the date it was physically counted or issued).
+          </div>
+
+          {/* CSV Columns */}
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Required CSV Columns</p>
+            <div className="flex flex-wrap gap-2">
+              {['SKU', 'Product Name', 'On Hand', 'Issued', 'Date'].map((col, i) => (
+                <span key={i} className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono text-gray-700 dark:text-gray-300">
+                  {col}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Upload area */}
+          <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors">
+            <Upload className="h-10 w-10 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-600 dark:text-gray-400 mb-3 text-sm">Drag and drop your CSV file here, or click to browse</p>
+            <input
+              ref={bulkFileRef}
+              type="file"
+              accept=".csv"
+              onChange={handleBulkFileChange}
+              className="hidden"
+              id="bulk-file-upload"
+            />
+            <Button variant="primary" onClick={() => bulkFileRef.current?.click()}>
+              Select File
+            </Button>
+            {bulkFileName && (
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-3">
+                Selected: <span className="font-semibold">{bulkFileName}</span>
+              </p>
+            )}
+          </div>
+
+          {/* Parse errors */}
+          {bulkErrors.length > 0 && (
+            <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3">
+              <div className="flex gap-2">
+                <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-red-900 dark:text-red-200 text-sm mb-1">CSV Errors</p>
+                  <ul className="text-sm text-red-800 dark:text-red-300 space-y-0.5">
+                    {bulkErrors.map((e, i) => <li key={i}>• {e}</li>)}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Preview */}
+          {bulkRows.length > 0 && bulkResults.length === 0 && (
+            <>
+              <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-2.5 text-sm text-blue-800 dark:text-blue-200">
+                <span className="font-semibold">{bulkRows.length}</span> rows ready — unit cost will be fetched from product records
+              </div>
+              <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 dark:bg-gray-800">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">SKU</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">Product Name</th>
+                      <th className="px-3 py-2 text-right font-semibold text-gray-700 dark:text-gray-300">On Hand</th>
+                      <th className="px-3 py-2 text-right font-semibold text-gray-700 dark:text-gray-300">Issued</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {bulkRows.slice(0, 10).map((row, i) => (
+                      <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                        <td className="px-3 py-2 font-mono text-gray-900 dark:text-white">{row.sku}</td>
+                        <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{row.productName}</td>
+                        <td className="px-3 py-2 text-right font-semibold text-green-700 dark:text-green-400">{row.onHand > 0 ? `+${row.onHand}` : '—'}</td>
+                        <td className="px-3 py-2 text-right font-semibold text-orange-600 dark:text-orange-400">{row.issued > 0 ? `-${row.issued}` : '—'}</td>
+                        <td className="px-3 py-2 text-gray-600 dark:text-gray-400">{row.date}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {bulkRows.length > 10 && (
+                  <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800">
+                    +{bulkRows.length - 10} more rows
+                  </div>
+                )}
+              </div>
+              <Button
+                variant="primary"
+                className="w-full"
+                onClick={handleBulkImport}
+                disabled={isBulkImporting || bulkErrors.length > 0}
+              >
+                {isBulkImporting ? 'Importing…' : `Import ${bulkRows.length} Rows`}
+              </Button>
+            </>
+          )}
+
+          {/* Results */}
+          {bulkResults.length > 0 && (
+            <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+              <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 flex items-center gap-3 text-sm">
+                <span className="font-semibold text-gray-900 dark:text-white">Import Results</span>
+                <span className="text-green-600 dark:text-green-400">{bulkResults.filter(r => r.status === 'success').length} succeeded</span>
+                {bulkResults.some(r => r.status === 'skipped') && (
+                  <span className="text-yellow-600 dark:text-yellow-400">{bulkResults.filter(r => r.status === 'skipped').length} skipped</span>
+                )}
+                {bulkResults.some(r => r.status === 'error') && (
+                  <span className="text-red-600 dark:text-red-400">{bulkResults.filter(r => r.status === 'error').length} errors</span>
+                )}
+              </div>
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 dark:bg-gray-800">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">SKU</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Status</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Detail</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {bulkResults.map((r, i) => (
+                    <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                      <td className="px-3 py-2 font-mono text-gray-900 dark:text-white">{r.sku}</td>
+                      <td className="px-3 py-2">
+                        {r.status === 'success'
+                          ? <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400"><CheckCircle2 className="h-4 w-4" /> OK</span>
+                          : r.status === 'skipped'
+                          ? <span className="inline-flex items-center gap-1 text-yellow-600 dark:text-yellow-400"><AlertCircle className="h-4 w-4" /> Skipped</span>
+                          : <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-400"><AlertCircle className="h-4 w-4" /> Error</span>}
+                      </td>
+                      <td className="px-3 py-2 text-gray-600 dark:text-gray-400 text-xs">{r.message}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Template download */}
+          <div className="flex justify-end pt-1">
+            <button
+              onClick={downloadBulkTemplate}
+              className="inline-flex items-center gap-1.5 text-sm text-primary-600 dark:text-primary-400 hover:underline"
+            >
+              <Download className="h-4 w-4" />
+              Download CSV Template
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Rejection Disposition Modal */}
       <RejectionDispositionModal

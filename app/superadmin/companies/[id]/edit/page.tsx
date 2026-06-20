@@ -138,7 +138,7 @@ export default function EditCompanyPage() {
         <div className="max-w-2xl mx-auto bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-8 text-center">
           <AlertCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
           <p className="text-red-600 dark:text-red-400 font-medium mb-4">Company not found</p>
-          <Link href="/superadmin/companies"><Button variant="ghost">Return to Companies</Button></Link>
+          <Button href="/superadmin/companies" variant="ghost">Return to Companies</Button>
         </div>
       </div>
     );
@@ -273,9 +273,8 @@ export default function EditCompanyPage() {
 
           {/* Actions */}
           <div className="flex gap-4">
-            <Link href="/superadmin/companies" className="flex-1">
-              <Button variant="ghost" className="w-full">Cancel</Button>
-            </Link>
+            
+              <Button href="/superadmin/companies" className="flex-1 w-full" variant="ghost">Cancel</Button>
             <button type="submit" disabled={isSaving}
               className="flex-1 px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
               {isSaving ? 'Saving...' : 'Save Changes'}

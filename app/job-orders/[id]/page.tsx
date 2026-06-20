@@ -13,6 +13,7 @@ import {
   getJobOrderBOM,
   getMaterialIssueSlips,
   getMaterialReturnSlips,
+  getMaterialIssueSlipItems,
   getMaterialReturnSlipItems,
   updateJobOrderStatus,
   getCompanyUsers,
@@ -84,7 +85,14 @@ export default function JobOrderDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [tab, setTab] = useState<Tab>((searchParams.get('tab') as Tab) || 'bom');
+  const [misItemsMap, setMisItemsMap] = useState<Record<string, any[]>>({});
   const [mrsItemsMap, setMrsItemsMap] = useState<Record<string, any[]>>({});
+  const [selectedMis, setSelectedMis] = useState<MaterialIssueSlip | null>(null);
+  const [selectedMrs, setSelectedMrs] = useState<MaterialReturnSlip | null>(null);
+  const [selectedMrf, setSelectedMrf] = useState<any | null>(null);
+  const [mrfSearch, setMrfSearch] = useState('');
+  const [misSearch, setMisSearch] = useState('');
+  const [mrsSearch, setMrsSearch] = useState('');
   const [canApprove, setCanApprove] = useState(false);
   const [canIssue, setCanIssue] = useState(false);
   const [canReturn, setCanReturn] = useState(false);
@@ -136,7 +144,17 @@ export default function JobOrderDetailPage() {
       }
       setJob(jobRes.data);
       setBom(Array.isArray(bomRes.data) ? bomRes.data : []);
-      setMisSlips(Array.isArray(misRes.data) ? misRes.data : []);
+      const misArr = Array.isArray(misRes.data) ? misRes.data : [];
+      setMisSlips(misArr);
+      // Load items for each MIS
+      if (misArr.length > 0) {
+        const misItemResults = await Promise.all(misArr.map((m: any) => getMaterialIssueSlipItems(m.id)));
+        const misMap: Record<string, any[]> = {};
+        misArr.forEach((m: any, i: number) => {
+          misMap[m.id] = Array.isArray(misItemResults[i]?.data) ? misItemResults[i]!.data : [];
+        });
+        setMisItemsMap(misMap);
+      }
       const mrsArr = Array.isArray(mrsRes.data) ? mrsRes.data : [];
       setMrsSlips(mrsArr);
       // Load items for each MRS
@@ -308,11 +326,10 @@ export default function JobOrderDetailPage() {
     <div className="flex-1 p-4 md:p-6 space-y-4 max-w-7xl mx-auto">
       {/* Top bar */}
       <div className="flex items-center gap-3 flex-wrap">
-        <Link href="/job-orders">
-          <Button variant="secondary" size="sm" className="flex items-center gap-2">
+        
+          <Button href="/job-orders" variant="secondary" size="sm" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />Back
           </Button>
-        </Link>
         <Hammer className="h-5 w-5 text-gray-500 dark:text-gray-400" />
         <h1 className="text-xl font-bold text-gray-900 dark:text-white font-mono">{job.jo_number}</h1>
         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[job.status]}`}>
@@ -325,13 +342,6 @@ export default function JobOrderDetailPage() {
 
         {/* Action buttons */}
         <div className="ml-auto flex items-center gap-2 flex-wrap">
-          {canRequestBOM && !['completed', 'cancelled'].includes(job.status) && (
-            <Link href={`/job-orders/${id}/bom-adjustment`}>
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1">
-                <ClipboardList className="h-4 w-4" />Request MRF
-              </Button>
-            </Link>
-          )}
           {job.status === 'pending_approval' && canApprove && (
             <>
               <Button onClick={() => handleStatusChange('approved')} disabled={isUpdating} className="bg-green-600 hover:bg-green-700 text-white">
@@ -348,25 +358,9 @@ export default function JobOrderDetailPage() {
             </Button>
           )}
           {job.status === 'in_progress' && (
-            <>
-              {canIssue && (
-                <Link href={`/job-orders/${id}/issue`}>
-                  <Button className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1">
-                    <PackageOpen className="h-4 w-4" />Issue Materials
-                  </Button>
-                </Link>
-              )}
-              {canReturn && (
-                <Link href={`/job-orders/${id}/return`}>
-                  <Button className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1">
-                    <RotateCcw className="h-4 w-4" />Record Returns
-                  </Button>
-                </Link>
-              )}
-              <Button onClick={() => setShowCompleteConfirm(true)} disabled={isUpdating} className="bg-green-600 hover:bg-green-700 text-white">
-                <CheckCircle2 className="h-4 w-4 mr-1" />Complete Job
-              </Button>
-            </>
+            <Button onClick={() => setShowCompleteConfirm(true)} disabled={isUpdating} className="bg-green-600 hover:bg-green-700 text-white">
+              <CheckCircle2 className="h-4 w-4 mr-1" />Complete Job
+            </Button>
           )}
         </div>
       </div>
@@ -401,129 +395,106 @@ export default function JobOrderDetailPage() {
         {/* BOM Requests Tab */}
         {tab === 'bomRequests' && (
           <div className="space-y-3">
-            {bomRequests.length === 0 ? (
-              <div className="flex items-center justify-center py-10 text-gray-400">
-                <AlertCircle className="h-5 w-5 mr-2" />
-                No MRF requests yet.
-              </div>
-            ) : (
-              <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                    <tr>
-                      <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">MRF #</th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Material</th>
-                      <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-400">Requested</th>
-                      <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-400">Available</th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Reason</th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Status</th>
-                      <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-400">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                    {bomRequests.map((r: any) => {
-                      const available = stockMap[r.product_id] ?? 0;
-                      const insufficientStock = r.status === 'pending_approval' && Number(r.requested_quantity) > available;
-                      return (
-                      <tr key={r.id}>
-                        <td className="px-4 py-2 font-mono text-xs text-gray-500 dark:text-gray-400">
-                          {r.request_number || '—'}
-                        </td>
-                        <td className="px-4 py-2">
-                          <p className="font-medium text-gray-900 dark:text-white">{r.product?.name || 'Item'}</p>
-                          {r.product?.sku && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">{r.product.sku}</p>
-                          )}
-                        </td>
-                        <td className="px-4 py-2 text-right text-gray-700 dark:text-gray-300">
-                          {r.job_order_bom_id ? (
-                            <>
-                              +{Number(r.requested_quantity).toLocaleString()}
-                              <div className="text-xs text-gray-400">currently {Number(r.current_quantity ?? 0).toLocaleString()}</div>
-                            </>
-                          ) : (
-                            <>
-                              {Number(r.requested_quantity).toLocaleString()}
-                              <div className="text-xs text-amber-600 dark:text-amber-400">new material</div>
-                            </>
-                          )}
-                        </td>
-                        <td className={`px-4 py-2 text-right font-medium ${insufficientStock ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'}`}>
-                          {r.status === 'pending_approval' ? (
-                            <>
-                              {available.toLocaleString()}
-                              {insufficientStock && (
-                                <div className="text-xs font-normal text-red-500">Insufficient stock</div>
-                              )}
-                            </>
-                          ) : '—'}
-                        </td>
-                        <td className="px-4 py-2 text-gray-500 dark:text-gray-400">
-                          {r.reason || '—'}
-                          {r.status !== 'pending_approval' && r.rejection_reason && (
-                            <div className="text-xs text-red-500">{r.rejection_reason}</div>
-                          )}
-                        </td>
-                        <td className="px-4 py-2">
-                          {r.status === 'pending_approval' ? (
-                            <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
-                              Pending Approval
-                            </span>
-                          ) : (
-                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                              r.status === 'approved'
-                                ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                                : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                            }`}>
-                              {r.status === 'approved' ? 'Approved' : 'Rejected'}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          {r.status === 'pending_approval' && (
-                            <div className="flex items-center justify-end gap-2">
-                              {canApprove && (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    disabled={isDecidingRequest === r.id || insufficientStock}
-                                    onClick={() => handleDecideBOMRequest(r.id, true)}
-                                    title={insufficientStock ? 'Not enough stock on hand to approve this request' : undefined}
-                                    className="bg-green-600 hover:bg-green-700 text-white"
-                                  >
-                                    Approve
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    disabled={isDecidingRequest === r.id}
-                                    onClick={() => handleDecideBOMRequest(r.id, false)}
-                                    className="border-red-400 text-red-600 hover:bg-red-50 dark:text-red-400"
-                                  >
-                                    Reject
-                                  </Button>
-                                </>
-                              )}
-                              {r.requested_by_user_id === currentUserId && (
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  disabled={isDecidingRequest === r.id}
-                                  onClick={() => handleCancelBOMRequest(r.id)}
-                                >
-                                  Cancel
-                                </Button>
-                              )}
-                            </div>
-                          )}
-                        </td>
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                placeholder="Search MRF #..."
+                value={mrfSearch}
+                onChange={e => setMrfSearch(e.target.value)}
+                className="w-full max-w-xs rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              {canRequestBOM && !['completed', 'cancelled'].includes(job.status) && (
+                <Button href={`/job-orders/${id}/bom-adjustment`} className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1 ml-auto">
+                  <ClipboardList className="h-4 w-4" />Request MRF
+                </Button>
+              )}
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 overflow-hidden">
+              {bomRequests.length === 0 ? (
+                <div className="flex items-center justify-center py-10 text-gray-400">
+                  <AlertCircle className="h-5 w-5 mr-2" />
+                  No MRF requests yet.
+                </div>
+              ) : (() => {
+                const q = mrfSearch.trim().toLowerCase();
+                const filtered = q
+                  ? bomRequests.filter((r: any) => (r.request_number || '').toLowerCase().includes(q) || (r.product?.name || '').toLowerCase().includes(q))
+                  : bomRequests;
+                if (filtered.length === 0) return (
+                  <div className="flex items-center justify-center py-10 text-gray-400 text-sm">No results for "{mrfSearch}"</div>
+                );
+                return (
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                      <tr>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">MRF #</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Material</th>
+                        <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-400">Qty</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Requestor</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Date Requested</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Status</th>
+                        <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-400">Actions</th>
                       </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                      {filtered.map((r: any) => {
+                        const available = stockMap[r.product_id] ?? 0;
+                        const insufficientStock = r.status === 'pending_approval' && Number(r.requested_quantity) > available;
+                        return (
+                          <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                            <td className="px-4 py-3 font-mono text-xs text-gray-500 dark:text-gray-400">{r.request_number || '—'}</td>
+                            <td className="px-4 py-3">
+                              <p className="font-medium text-gray-900 dark:text-white">{r.product?.name || 'Item'}</p>
+                              {r.product?.sku && <p className="text-xs text-gray-400 font-mono">{r.product.sku}</p>}
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300 font-medium">
+                              {r.job_order_bom_id ? `+${Number(r.requested_quantity).toLocaleString()}` : Number(r.requested_quantity).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                              {r.requested_by_user_id ? (userMap[r.requested_by_user_id] || '—') : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                              {r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                r.status === 'pending_approval' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
+                                : r.status === 'approved' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                                : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                              }`}>
+                                {r.status === 'pending_approval' ? 'Pending' : r.status === 'approved' ? 'Approved' : 'Rejected'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <button onClick={() => setSelectedMrf(r)} className="text-primary-600 hover:underline dark:text-primary-400 text-xs font-medium">
+                                  View
+                                </button>
+                                {r.status === 'pending_approval' && canApprove && (
+                                  <>
+                                    <Button size="sm" disabled={isDecidingRequest === r.id || insufficientStock} onClick={() => handleDecideBOMRequest(r.id, true)} className="bg-green-600 hover:bg-green-700 text-white h-6 px-2 text-xs">
+                                      Approve
+                                    </Button>
+                                    <Button size="sm" variant="secondary" disabled={isDecidingRequest === r.id} onClick={() => handleDecideBOMRequest(r.id, false)} className="border-red-400 text-red-600 hover:bg-red-50 dark:text-red-400 h-6 px-2 text-xs">
+                                      Reject
+                                    </Button>
+                                  </>
+                                )}
+                                {r.status === 'pending_approval' && r.requested_by_user_id === currentUserId && (
+                                  <Button size="sm" variant="secondary" disabled={isDecidingRequest === r.id} onClick={() => handleCancelBOMRequest(r.id)} className="h-6 px-2 text-xs">
+                                    Cancel
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                );
+              })()}
+            </div>
           </div>
         )}
 
@@ -676,141 +647,149 @@ export default function JobOrderDetailPage() {
 
         {/* Issue Slips Tab */}
         {tab === 'issues' && (
-          <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 overflow-hidden">
-            {misSlips.length === 0 ? (
-              <div className="flex items-center justify-center py-10 text-gray-400">
-                <AlertCircle className="h-5 w-5 mr-2" />
-                No issue slips yet
-                {job.status === 'in_progress' && (
-                  <Link href={`/job-orders/${id}/issue`} className="ml-2 text-primary-600 dark:text-primary-400 underline text-sm">
-                    Issue Materials
-                  </Link>
-                )}
-              </div>
-            ) : (
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                  <tr>
-                    <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">MIS #</th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Issued By</th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Received By</th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Issued At</th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {misSlips.map(mis => (
-                    <tr key={mis.id}>
-                      <td className="px-4 py-2 font-mono font-medium text-gray-900 dark:text-white">{mis.mis_number}</td>
-                      <td className="px-4 py-2 text-gray-600 dark:text-gray-400">
-                        {mis.issued_by_user_id ? (userMap[mis.issued_by_user_id] || '—') : '—'}
-                      </td>
-                      <td className="px-4 py-2 text-gray-600 dark:text-gray-400">
-                        {mis.received_by_user_id ? (userMap[mis.received_by_user_id] || '—') : '—'}
-                      </td>
-                      <td className="px-4 py-2 text-gray-600 dark:text-gray-400">
-                        {mis.issued_at ? new Date(mis.issued_at).toLocaleString() : '—'}
-                      </td>
-                      <td className="px-4 py-2">
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${MIS_STATUS_COLORS[mis.status]}`}>
-                          {mis.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                placeholder="Search MIS #..."
+                value={misSearch}
+                onChange={e => setMisSearch(e.target.value)}
+                className="w-full max-w-xs rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              {canIssue && job.status === 'in_progress' && (
+                <Button href={`/job-orders/${id}/issue`} className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1 ml-auto">
+                  <PackageOpen className="h-4 w-4" />Issue Materials
+                </Button>
+              )}
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 overflow-hidden">
+              {misSlips.length === 0 ? (
+                <div className="flex items-center justify-center py-10 text-gray-400">
+                  <AlertCircle className="h-5 w-5 mr-2" />
+                  No issue slips yet
+                  {job.status === 'in_progress' && (
+                    <Link href={`/job-orders/${id}/issue`} className="ml-2 text-primary-600 dark:text-primary-400 underline text-sm">
+                      Issue Materials
+                    </Link>
+                  )}
+                </div>
+              ) : (() => {
+                const q = misSearch.trim().toLowerCase();
+                const filtered = q ? misSlips.filter(m => m.mis_number.toLowerCase().includes(q)) : misSlips;
+                if (filtered.length === 0) return (
+                  <div className="flex items-center justify-center py-10 text-gray-400 text-sm">No results for "{misSearch}"</div>
+                );
+                return (
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                      <tr>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">MIS #</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Issued By</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Received By</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Issued At</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Items</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Status</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                      {filtered.map(mis => {
+                        const items = misItemsMap[mis.id] || [];
+                        return (
+                          <tr key={mis.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                            <td className="px-4 py-3 font-mono font-medium text-gray-900 dark:text-white">{mis.mis_number}</td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{mis.issued_by_user_id ? (userMap[mis.issued_by_user_id] || '—') : '—'}</td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{mis.received_by_user_id ? (userMap[mis.received_by_user_id] || '—') : '—'}</td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{mis.issued_at ? new Date(mis.issued_at).toLocaleString() : '—'}</td>
+                            <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{items.length} {items.length === 1 ? 'item' : 'items'}</td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${MIS_STATUS_COLORS[mis.status]}`}>{mis.status}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <button onClick={() => setSelectedMis(mis)} className="text-primary-600 hover:underline dark:text-primary-400 text-xs font-medium">View Details</button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                );
+              })()}
+            </div>
           </div>
         )}
 
         {/* Return Slips Tab */}
         {tab === 'returns' && (
           <div className="space-y-3">
-            {mrsSlips.length === 0 ? (
-              <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 flex items-center justify-center py-10 text-gray-400">
-                <AlertCircle className="h-5 w-5 mr-2" />
-                No return slips yet
-                {job.status === 'in_progress' && (
-                  <Link href={`/job-orders/${id}/return`} className="ml-2 text-primary-600 dark:text-primary-400 underline text-sm">
-                    Record Returns
-                  </Link>
-                )}
-              </div>
-            ) : (
-              mrsSlips.map(mrs => {
-                const slipItems: any[] = mrsItemsMap[mrs.id] || [];
-                return (
-                  <div key={mrs.id} className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 overflow-hidden">
-                    {/* MRS header */}
-                    <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono font-semibold text-gray-900 dark:text-white">{mrs.mrs_number}</span>
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${MRS_STATUS_COLORS[mrs.status]}`}>
-                          {mrs.status}
-                        </span>
-                        <span className="text-xs text-gray-400 dark:text-gray-500">
-                          {mrs.returned_at ? new Date(mrs.returned_at).toLocaleString() : '—'}
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 flex gap-3">
-                        {mrs.returned_by_user_id && (
-                          <span>Returned by: <strong className="text-gray-700 dark:text-gray-300">{userMap[mrs.returned_by_user_id] || '—'}</strong></span>
-                        )}
-                        {mrs.received_by_user_id && (
-                          <span>Received by: <strong className="text-gray-700 dark:text-gray-300">{userMap[mrs.received_by_user_id] || '—'}</strong></span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Items */}
-                    {slipItems.length === 0 ? (
-                      <div className="px-4 py-3 text-xs text-gray-400">No items recorded for this slip.</div>
-                    ) : (
-                      <table className="w-full text-sm">
-                        <thead className="border-b border-gray-100 dark:border-gray-800">
-                          <tr>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Material</th>
-                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">Qty Returned</th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Condition</th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Notes</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                          {slipItems.map((item: any) => (
-                            <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                              <td className="px-4 py-2.5">
-                                <p className="font-medium text-gray-900 dark:text-white">
-                                  {item.product?.name || item.product_id || '—'}
-                                </p>
-                                {item.product?.sku && (
-                                  <p className="text-xs text-gray-500 font-mono">{item.product.sku}</p>
-                                )}
-                              </td>
-                              <td className="px-4 py-2.5 text-right font-semibold text-green-600 dark:text-green-400">
-                                {Number(item.quantity_returned).toLocaleString()}
-                              </td>
-                              <td className="px-4 py-2.5">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
-                                  item.condition === 'good' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                                  : item.condition === 'damaged' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
-                                  : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                                }`}>
-                                  {item.condition}
-                                </span>
-                              </td>
-                              <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-gray-400">
-                                {item.notes || '—'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                placeholder="Search MRS #..."
+                value={mrsSearch}
+                onChange={e => setMrsSearch(e.target.value)}
+                className="w-full max-w-xs rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              {canReturn && job.status === 'in_progress' && (
+                <Button href={`/job-orders/${id}/return`} className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1 ml-auto">
+                  <RotateCcw className="h-4 w-4" />Record Returns
+                </Button>
+              )}
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 overflow-hidden">
+              {mrsSlips.length === 0 ? (
+                <div className="flex items-center justify-center py-10 text-gray-400">
+                  <AlertCircle className="h-5 w-5 mr-2" />
+                  No return slips yet
+                  {job.status === 'in_progress' && (
+                    <Link href={`/job-orders/${id}/return`} className="ml-2 text-primary-600 dark:text-primary-400 underline text-sm">
+                      Record Returns
+                    </Link>
+                  )}
+                </div>
+              ) : (() => {
+                const q = mrsSearch.trim().toLowerCase();
+                const filtered = q ? mrsSlips.filter(m => m.mrs_number.toLowerCase().includes(q)) : mrsSlips;
+                if (filtered.length === 0) return (
+                  <div className="flex items-center justify-center py-10 text-gray-400 text-sm">No results for "{mrsSearch}"</div>
                 );
-              })
-            )}
+                return (
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                      <tr>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">MRS #</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Returned By</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Received By</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Returned At</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Items</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Status</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                      {filtered.map(mrs => {
+                        const items = mrsItemsMap[mrs.id] || [];
+                        return (
+                          <tr key={mrs.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                            <td className="px-4 py-3 font-mono font-medium text-gray-900 dark:text-white">{mrs.mrs_number}</td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{mrs.returned_by_user_id ? (userMap[mrs.returned_by_user_id] || '—') : '—'}</td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{mrs.received_by_user_id ? (userMap[mrs.received_by_user_id] || '—') : '—'}</td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{mrs.returned_at ? new Date(mrs.returned_at).toLocaleString() : '—'}</td>
+                            <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{items.length} {items.length === 1 ? 'item' : 'items'}</td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${MRS_STATUS_COLORS[mrs.status]}`}>{mrs.status}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <button onClick={() => setSelectedMrs(mrs)} className="text-primary-600 hover:underline dark:text-primary-400 text-xs font-medium">View Details</button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                );
+              })()}
+            </div>
           </div>
         )}
 
@@ -948,6 +927,230 @@ export default function JobOrderDetailPage() {
           </div>
         </div>
       )}
+
+      {/* MRF Detail Modal */}
+      {selectedMrf && (() => {
+        const available = stockMap[selectedMrf.product_id] ?? 0;
+        const insufficientStock = selectedMrf.status === 'pending_approval' && Number(selectedMrf.requested_quantity) > available;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                <div className="flex items-center gap-3">
+                  <span className="font-mono font-bold text-gray-900 dark:text-white">{selectedMrf.request_number || '—'}</span>
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                    selectedMrf.status === 'pending_approval' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
+                    : selectedMrf.status === 'approved' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                    : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                  }`}>
+                    {selectedMrf.status === 'pending_approval' ? 'Pending Approval' : selectedMrf.status === 'approved' ? 'Approved' : 'Rejected'}
+                  </span>
+                </div>
+                <button onClick={() => setSelectedMrf(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none">✕</button>
+              </div>
+              <div className="px-5 py-2 border-b border-gray-100 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 flex flex-wrap gap-4">
+                {selectedMrf.requested_by_user_id && (
+                  <span>Requestor: <strong className="text-gray-700 dark:text-gray-300">{userMap[selectedMrf.requested_by_user_id] || '—'}</strong></span>
+                )}
+                {selectedMrf.created_at && (
+                  <span>Date: <strong className="text-gray-700 dark:text-gray-300">{new Date(selectedMrf.created_at).toLocaleString()}</strong></span>
+                )}
+              </div>
+              <div className="overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                    <tr>
+                      <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Material</th>
+                      <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">{selectedMrf.job_order_bom_id ? 'Qty Increase' : 'Qty Requested'}</th>
+                      {selectedMrf.status === 'pending_approval' && (
+                        <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">Available</th>
+                      )}
+                      <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b border-gray-100 dark:border-gray-800">
+                      <td className="px-5 py-3">
+                        <p className="font-semibold text-gray-900 dark:text-white">{selectedMrf.product?.name || '—'}</p>
+                        {selectedMrf.product?.sku && <p className="text-xs text-gray-400 font-mono">{selectedMrf.product.sku}</p>}
+                      </td>
+                      <td className="px-5 py-3 text-right font-semibold text-gray-900 dark:text-white">
+                        {selectedMrf.job_order_bom_id ? `+${Number(selectedMrf.requested_quantity).toLocaleString()}` : Number(selectedMrf.requested_quantity).toLocaleString()}
+                        {selectedMrf.job_order_bom_id && (
+                          <p className="text-xs font-normal text-gray-400">current: {Number(selectedMrf.current_quantity ?? 0).toLocaleString()}</p>
+                        )}
+                      </td>
+                      {selectedMrf.status === 'pending_approval' && (
+                        <td className={`px-5 py-3 text-right font-semibold ${insufficientStock ? 'text-red-500' : 'text-gray-900 dark:text-white'}`}>
+                          {available.toLocaleString()}
+                          {insufficientStock && <p className="text-xs font-normal text-red-500">Insufficient</p>}
+                        </td>
+                      )}
+                      <td className="px-5 py-3 text-gray-600 dark:text-gray-400 text-xs">
+                        {selectedMrf.reason || '—'}
+                        {selectedMrf.rejection_reason && (
+                          <p className="text-red-500 mt-1">{selectedMrf.rejection_reason}</p>
+                        )}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div className="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between gap-2">
+                {selectedMrf.status === 'pending_approval' && canApprove && (
+                  <div className="flex gap-2">
+                    <Button size="sm" disabled={isDecidingRequest === selectedMrf.id || insufficientStock} onClick={() => { handleDecideBOMRequest(selectedMrf.id, true); setSelectedMrf(null); }} className="bg-green-600 hover:bg-green-700 text-white">Approve</Button>
+                    <Button size="sm" variant="secondary" disabled={isDecidingRequest === selectedMrf.id} onClick={() => { handleDecideBOMRequest(selectedMrf.id, false); setSelectedMrf(null); }} className="border-red-400 text-red-600 hover:bg-red-50 dark:text-red-400">Reject</Button>
+                  </div>
+                )}
+                {selectedMrf.status === 'pending_approval' && selectedMrf.requested_by_user_id === currentUserId && (
+                  <Button size="sm" variant="secondary" disabled={isDecidingRequest === selectedMrf.id} onClick={() => { handleCancelBOMRequest(selectedMrf.id); setSelectedMrf(null); }}>Cancel Request</Button>
+                )}
+                <Button variant="secondary" size="sm" onClick={() => setSelectedMrf(null)} className="ml-auto">Close</Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* MRS Detail Modal */}
+      {selectedMrs && (() => {
+        const slipItems: any[] = mrsItemsMap[selectedMrs.id] || [];
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-xl max-h-[80vh] flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                <div className="flex items-center gap-3">
+                  <span className="font-mono font-bold text-gray-900 dark:text-white">{selectedMrs.mrs_number}</span>
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${MRS_STATUS_COLORS[selectedMrs.status]}`}>{selectedMrs.status}</span>
+                </div>
+                <button onClick={() => setSelectedMrs(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none">✕</button>
+              </div>
+              <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 flex flex-wrap gap-4">
+                <span>Returned At: <strong className="text-gray-700 dark:text-gray-300">{selectedMrs.returned_at ? new Date(selectedMrs.returned_at).toLocaleString() : '—'}</strong></span>
+                {selectedMrs.returned_by_user_id && <span>Returned By: <strong className="text-gray-700 dark:text-gray-300">{userMap[selectedMrs.returned_by_user_id] || '—'}</strong></span>}
+                {selectedMrs.received_by_user_id && <span>Received By: <strong className="text-gray-700 dark:text-gray-300">{userMap[selectedMrs.received_by_user_id] || '—'}</strong></span>}
+              </div>
+              <div className="overflow-y-auto flex-1">
+                {slipItems.length === 0 ? (
+                  <div className="flex items-center justify-center py-10 text-gray-400 text-sm"><AlertCircle className="h-5 w-5 mr-2" />No items recorded.</div>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0">
+                      <tr>
+                        <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Material</th>
+                        <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">Qty Returned</th>
+                        <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Condition</th>
+                        <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                      {slipItems.map((item: any) => (
+                        <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                          <td className="px-5 py-3">
+                            <p className="font-medium text-gray-900 dark:text-white">{item.product?.name || item.product_id || '—'}</p>
+                            {item.product?.sku && <p className="text-xs text-gray-400 font-mono">{item.product.sku}</p>}
+                          </td>
+                          <td className="px-5 py-3 text-right font-semibold text-green-600 dark:text-green-400">{Number(item.quantity_returned).toLocaleString()}</td>
+                          <td className="px-5 py-3">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
+                              item.condition === 'good' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                              : item.condition === 'damaged' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
+                              : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                            }`}>{item.condition}</span>
+                          </td>
+                          <td className="px-5 py-3 text-xs text-gray-500 dark:text-gray-400">{item.notes || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+              <div className="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+                <Button variant="secondary" size="sm" onClick={() => setSelectedMrs(null)}>Close</Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* MIS Detail Modal */}
+      {selectedMis && (() => {
+        const slipItems: any[] = misItemsMap[selectedMis.id] || [];
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-xl max-h-[80vh] flex flex-col overflow-hidden">
+              {/* Modal header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                <div className="flex items-center gap-3">
+                  <span className="font-mono font-bold text-gray-900 dark:text-white">{selectedMis.mis_number}</span>
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${MIS_STATUS_COLORS[selectedMis.status]}`}>
+                    {selectedMis.status}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setSelectedMis(null)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Meta */}
+              <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 flex flex-wrap gap-4">
+                <span>Issued At: <strong className="text-gray-700 dark:text-gray-300">{selectedMis.issued_at ? new Date(selectedMis.issued_at).toLocaleString() : '—'}</strong></span>
+                {selectedMis.issued_by_user_id && (
+                  <span>Issued By: <strong className="text-gray-700 dark:text-gray-300">{userMap[selectedMis.issued_by_user_id] || '—'}</strong></span>
+                )}
+                {selectedMis.received_by_user_id && (
+                  <span>Received By: <strong className="text-gray-700 dark:text-gray-300">{userMap[selectedMis.received_by_user_id] || '—'}</strong></span>
+                )}
+              </div>
+
+              {/* Items */}
+              <div className="overflow-y-auto flex-1">
+                {slipItems.length === 0 ? (
+                  <div className="flex items-center justify-center py-10 text-gray-400 text-sm">
+                    <AlertCircle className="h-5 w-5 mr-2" /> No items recorded.
+                  </div>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0">
+                      <tr>
+                        <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Material</th>
+                        <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">Qty Issued</th>
+                        <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                      {slipItems.map((item: any) => (
+                        <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                          <td className="px-5 py-3">
+                            <p className="font-medium text-gray-900 dark:text-white">{item.product?.name || '—'}</p>
+                            {item.product?.sku && <p className="text-xs text-gray-400 font-mono">{item.product.sku}</p>}
+                          </td>
+                          <td className="px-5 py-3 text-right font-semibold text-gray-900 dark:text-white">
+                            {Number(item.quantity_issued).toLocaleString()}
+                            {item.product?.unit_of_measure && (
+                              <span className="ml-1 text-xs font-normal text-gray-400">{item.product.unit_of_measure}</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-3 text-gray-500 dark:text-gray-400 text-xs">{item.notes || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+                <Button variant="secondary" size="sm" onClick={() => setSelectedMis(null)}>Close</Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

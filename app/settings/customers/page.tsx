@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, ArrowLeft, Search, Upload } from 'lucide-react';
-import Link from 'next/link';
+import { Plus, Edit2, Trash2, ArrowLeft, Search, Upload, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { BulkUploadModal } from '@/components/bulk-upload-modal';
@@ -16,6 +15,14 @@ export default function CustomersPage() {
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyCode = (id: string, code: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
   const [formData, setFormData] = useState({
     customer_code: '',
     name: '',
@@ -154,12 +161,11 @@ export default function CustomersPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/settings">
-            <Button variant="secondary" size="sm">
+          
+            <Button href="/settings" variant="secondary" size="sm">
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
-          </Link>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Customers Management</h1>
             <p className="text-gray-600 dark:text-gray-400">Create and manage customer information</p>
@@ -329,6 +335,9 @@ export default function CustomersPage() {
                   Customer Name
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                  Code
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
                   Email
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
@@ -347,6 +356,20 @@ export default function CustomersPage() {
                 <tr key={customer.id} className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
                   <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
                     {customer.name}
+                  </td>
+                  <td className="px-6 py-4">
+                    <button
+                      onClick={() => copyCode(customer.id, customer.customer_code || '')}
+                      title="Copy customer code"
+                      className="flex items-center gap-1.5 group"
+                    >
+                      <span className="font-mono font-semibold text-sm text-gray-700 dark:text-gray-300">
+                        {customer.customer_code || '—'}
+                      </span>
+                      {copiedId === customer.id
+                        ? <Check className="h-3.5 w-3.5 text-green-500" />
+                        : <Copy className="h-3.5 w-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                    </button>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
                     {customer.email}

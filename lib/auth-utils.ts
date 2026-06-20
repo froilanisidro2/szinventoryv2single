@@ -153,8 +153,8 @@ export function canAccessRoute(pathname: string): boolean {
   // Routes always accessible when authenticated
   if (pathname.startsWith('/dashboard') || pathname.startsWith('/profile')) return true;
 
-  // Settings — admin only
-  if (pathname.startsWith('/settings')) return isAdmin;
+  // Settings — admin or users with settings:write permission
+  if (pathname.startsWith('/settings')) return isAdmin || hasPerm('settings:write');
 
   // Permission-gated routes
   if (pathname.startsWith('/inventory') || pathname.startsWith('/products')) return hasPerm('inventory:read');

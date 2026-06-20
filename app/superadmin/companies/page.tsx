@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getCompanies, deactivateCompany, deleteCompany } from '@/app/actions';
 import { getSuperAdminSession } from '@/lib/auth-utils';
-import Link from 'next/link';
 
 interface Company {
   id: string;
@@ -253,12 +252,11 @@ export default function CompaniesPage() {
             </select>
 
             {/* Create Button */}
-            <Link href="/superadmin/companies/create">
-              <Button className="flex items-center gap-2">
+            
+              <Button href="/superadmin/companies/create" className="flex items-center gap-2">
                 <Plus className="h-5 w-5" />
                 New Company
               </Button>
-            </Link>
           </div>
 
           {/* Stats */}
@@ -294,9 +292,8 @@ export default function CompaniesPage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-12 text-center">
             <Building2 className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
             <p className="text-gray-600 dark:text-gray-400 mb-4">No companies found</p>
-            <Link href="/superadmin/companies/create">
-              <Button>Create First Company</Button>
-            </Link>
+            
+              <Button href="/superadmin/companies/create">Create First Company</Button>
           </div>
         ) : (
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -398,12 +395,10 @@ export default function CompaniesPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <Link href={`/superadmin/companies/${company.id}`}>
-                            <Button variant="ghost" size="sm" className="flex items-center gap-1">
+                          <Button href={`/superadmin/companies/${company.id}`} variant="ghost" size="sm" className="flex items-center gap-1">
                               <EyeIcon className="h-4 w-4" />
                               View
                             </Button>
-                          </Link>
                           <Button
                             variant="ghost"
                             size="sm"

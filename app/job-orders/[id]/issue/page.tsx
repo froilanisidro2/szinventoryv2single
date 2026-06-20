@@ -199,12 +199,10 @@ export default function IssueMaterialsPage() {
   return (
     <div className="flex-1 space-y-6 p-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-4">
-        <Link href={`/job-orders/${joId}`}>
-          <Button variant="secondary" size="sm" className="flex items-center gap-2">
+        <Button href={`/job-orders/${joId}`} variant="secondary" size="sm" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
             Back to JO
           </Button>
-        </Link>
         <div>
           <div className="flex items-center gap-2">
             <PackageOpen className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -429,9 +427,7 @@ export default function IssueMaterialsPage() {
       </div>
 
       <div className="flex justify-end gap-3">
-        <Link href={`/job-orders/${joId}`}>
-          <Button variant="secondary">Cancel</Button>
-        </Link>
+        <Button href={`/job-orders/${joId}`} variant="secondary">Cancel</Button>
         <Button
           onClick={handleIssue}
           disabled={isSubmitting}

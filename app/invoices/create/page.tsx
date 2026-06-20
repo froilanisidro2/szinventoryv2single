@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { FileText, Plus, Trash2, ArrowLeft, Search } from 'lucide-react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -187,9 +186,8 @@ export default function CreateInvoicePage() {
     <div className="space-y-6 p-4 md:p-6 max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link href="/invoices">
-          <Button variant="secondary" icon={<ArrowLeft className="h-4 w-4" />}>Back</Button>
-        </Link>
+        
+          <Button href="/invoices" variant="secondary" icon={<ArrowLeft className="h-4 w-4" />}>Back</Button>
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Create Invoice</h1>
           <p className="text-gray-600 dark:text-gray-400">Create a new sales invoice</p>
@@ -422,9 +420,8 @@ export default function CreateInvoicePage() {
 
         {/* Actions */}
         <div className="flex gap-3">
-          <Link href="/invoices" className="flex-1">
-            <Button variant="secondary" className="w-full">Cancel</Button>
-          </Link>
+          
+            <Button href="/invoices" className="flex-1 w-full" variant="secondary">Cancel</Button>
           <Button type="submit" variant="primary" className="flex-1" disabled={isLoading || loadingData}>
             {isLoading ? 'Creating...' : 'Create Invoice'}
           </Button>

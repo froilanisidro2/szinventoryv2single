@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, Plus, Shield, Trash2, AlertCircle, Mail } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import {
@@ -111,12 +110,11 @@ export default function CompanyUsersPage() {
     <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/admin">
-          <Button variant="ghost" size="sm" className="gap-2">
+        
+          <Button href="/admin" variant="ghost" size="sm" className="gap-2">
             <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
-        </Link>
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{company.name}</h1>
           <p className="text-gray-600 dark:text-gray-400">Manage company users</p>
@@ -159,11 +157,9 @@ export default function CompanyUsersPage() {
       {/* Add User Button */}
       <div className="flex gap-2">
         {canAddMoreUsers ? (
-          <Link href={`/admin/companies/${companyId}/users/add`}>
-            <Button variant="primary" icon={<Plus className="h-4 w-4" />}>
+          <Button href={`/admin/companies/${companyId}/users/add`} variant="primary" icon={<Plus className="h-4 w-4" />}>
               Add User
             </Button>
-          </Link>
         ) : (
           <div className="flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm">
             <AlertCircle className="h-4 w-4" />

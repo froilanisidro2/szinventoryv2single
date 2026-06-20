@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Search, FileText, Truck, Calendar, Eye, Package, FileCheck, CheckCircle, Send, Download } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Pagination } from '@/components/ui/pagination';
 import type { PurchaseOrder } from '@/types';
@@ -305,11 +304,10 @@ ${companyName}`);
           <Button variant="secondary" icon={<Download className="h-4 w-4" />} onClick={downloadCSV}>
             CSV
           </Button>
-          <Link href="/purchase-orders/create">
-            <Button variant="primary" icon={<Plus className="h-4 w-4" />}>
+          
+            <Button href="/purchase-orders/create" variant="primary" icon={<Plus className="h-4 w-4" />}>
               Create PO
             </Button>
-          </Link>
         </div>
       </div>
 
@@ -504,20 +502,16 @@ ${companyName}`);
                       )}
                       {/* GRN — only show after PO is fully received */}
                       {order.status === 'received' && (
-                        <Link href={`/purchase-orders/${order.id}/grn`} className="inline-flex">
-                          <Button variant="ghost" size="sm" className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 dark:hover:bg-orange-900/10 gap-1">
+                        <Button href={`/purchase-orders/${order.id}/grn`} className="inline-flex text-orange-600 hover:text-orange-700 hover:bg-orange-50 dark:hover:bg-orange-900/10 gap-1" variant="ghost" size="sm">
                             <FileCheck className="h-4 w-4" />
                             GRN
                           </Button>
-                        </Link>
                       )}
                       {/* View Details */}
-                      <Link href={`/purchase-orders/${order.id}`} className="inline-flex items-center gap-2">
-                        <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50 dark:hover:bg-primary-900/10">
+                      <Button href={`/purchase-orders/${order.id}`} className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 hover:bg-primary-50 dark:hover:bg-primary-900/10" variant="ghost" size="sm">
                           <Eye className="h-4 w-4" />
                           View
                         </Button>
-                      </Link>
                     </div>
                   </td>
                 </tr>

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { QrCode, Download, ArrowLeft, Printer } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { getProducts } from '@/app/actions';
 
@@ -96,11 +95,10 @@ export default function QRCodeGeneratorPage() {
     <div className="space-y-6 p-4 md:p-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link href="/inventory">
-          <Button variant="secondary" icon={<ArrowLeft className="h-4 w-4" />}>
+        
+          <Button href="/inventory" variant="secondary" icon={<ArrowLeft className="h-4 w-4" />}>
             Back
           </Button>
-        </Link>
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <QrCode className="h-8 w-8 text-primary-600" />
@@ -169,16 +167,16 @@ export default function QRCodeGeneratorPage() {
             <div className="card p-4 space-y-2">
               <Button
                 variant="primary"
-                className="w-full"
-                icon={<Download className="h-4 w-4" />}
+                className="w-full h-4 w-4"
+                icon={<Download />}
                 onClick={handleDownload}
               >
                 Download PNG
               </Button>
               <Button
                 variant="secondary"
-                className="w-full"
-                icon={<Printer className="h-4 w-4" />}
+                className="w-full h-4 w-4"
+                icon={<Printer />}
                 onClick={handlePrint}
                 disabled={isPrinting}
               >
@@ -188,11 +186,10 @@ export default function QRCodeGeneratorPage() {
           )}
 
           {/* Batch Actions */}
-          <Link href="/inventory/bulk-upload" className="block">
-            <Button variant="secondary" className="w-full">
+          
+            <Button href="/inventory/bulk-upload" className="block w-full" variant="secondary">
               Bulk Upload
             </Button>
-          </Link>
 
           {/* Info */}
           <div className="card p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">

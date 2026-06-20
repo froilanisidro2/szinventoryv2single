@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { ArrowLeft, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -21,6 +20,8 @@ interface ReturnRow {
   productName: string;
   productSku: string;
   quantityIssued: number;
+  quantityReturned: number;
+  quantityScrapped: number;
   quantityToReturn: number;
   condition: 'good' | 'damaged' | 'scrap';
   binLocationId: string;
@@ -80,17 +81,24 @@ export default function ReturnMaterialsPage() {
       setRows(
         bomItems
           .filter(item => Number(item.quantity_issued || 0) > 0)
-          .map(item => ({
-            bomId: item.id,
-            productId: item.product_id || '',
-            productName: item.product?.name || item.product_name || item.product_id || '—',
-            productSku: item.product?.sku || item.product_sku || '',
-            quantityIssued: Number(item.quantity_issued || 0),
-            quantityToReturn: 0,
-            condition: 'good' as const,
-            binLocationId: item.product?.bin_location_id || '',
-            notes: '',
-          }))
+          .map(item => {
+            const issued = Number(item.quantity_issued || 0);
+            const returned = Number(item.quantity_returned || 0);
+            const scrapped = Number(item.quantity_scrapped || 0);
+            return {
+              bomId: item.id,
+              productId: item.product_id || '',
+              productName: item.product?.name || item.product_name || item.product_id || '—',
+              productSku: item.product?.sku || item.product_sku || '',
+              quantityIssued: issued,
+              quantityReturned: returned,
+              quantityScrapped: scrapped,
+              quantityToReturn: 0,
+              condition: 'good' as const,
+              binLocationId: item.product?.bin_location_id || '',
+              notes: '',
+            };
+          })
       );
     } catch {
       toast.error('Error loading data');
@@ -106,8 +114,9 @@ export default function ReturnMaterialsPage() {
       return;
     }
     for (const r of itemsToReturn) {
-      if (r.quantityToReturn > r.quantityIssued) {
-        toast.error(`Cannot return more than issued (${r.productName}: issued ${r.quantityIssued})`);
+      const maxReturnable = r.quantityIssued - r.quantityReturned - r.quantityScrapped;
+      if (r.quantityToReturn > maxReturnable) {
+        toast.error(`Cannot return more than remaining (${r.productName}: ${maxReturnable} remaining)`);
         return;
       }
     }
@@ -156,12 +165,10 @@ export default function ReturnMaterialsPage() {
   return (
     <div className="flex-1 space-y-6 p-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-4">
-        <Link href={`/job-orders/${joId}`}>
-          <Button variant="secondary" size="sm" className="flex items-center gap-2">
+        <Button href={`/job-orders/${joId}`} variant="secondary" size="sm" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
             Back to JO
           </Button>
-        </Link>
         <div>
           <div className="flex items-center gap-2">
             <RotateCcw className="h-5 w-5 text-orange-600 dark:text-orange-400" />
@@ -192,7 +199,9 @@ export default function ReturnMaterialsPage() {
               <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                 <tr>
                   <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Material</th>
-                  <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-400">Total Issued</th>
+                  <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-400">Issued</th>
+                  <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-400">Returned</th>
+                  <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-400">Remaining</th>
                   <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-400 w-28">Return Qty</th>
                   <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400 w-36">Condition</th>
                   <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Return to Bin</th>
@@ -200,28 +209,42 @@ export default function ReturnMaterialsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {rows.map(row => (
-                  <tr key={row.bomId}>
+                {rows.map(row => {
+                  const remaining = row.quantityIssued - row.quantityReturned - row.quantityScrapped;
+                  const isFullyReturned = remaining <= 0;
+                  return (
+                  <tr key={row.bomId} className={isFullyReturned ? 'opacity-50' : ''}>
                     <td className="px-4 py-2">
                       <p className="font-medium text-gray-900 dark:text-white">{row.productName}</p>
                       {row.productSku && (
                         <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">{row.productSku}</p>
                       )}
                     </td>
-                    <td className="px-4 py-2 text-right text-blue-600 dark:text-blue-400">
+                    <td className="px-4 py-2 text-right text-blue-600 dark:text-blue-400 font-medium">
                       {row.quantityIssued.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2 text-right text-orange-500 dark:text-orange-400">
+                      {(row.quantityReturned + row.quantityScrapped).toLocaleString()}
+                    </td>
+                    <td className={`px-4 py-2 text-right font-semibold ${isFullyReturned ? 'text-gray-400' : 'text-green-600 dark:text-green-400'}`}>
+                      {remaining <= 0 ? '—' : remaining.toLocaleString()}
+                      {isFullyReturned && <div className="text-xs font-normal text-gray-400">fully returned</div>}
                     </td>
                     <td className="px-4 py-2 text-right">
                       <input
                         type="number"
                         min={0}
-                        max={row.quantityIssued}
+                        max={remaining}
                         step={0.01}
+                        disabled={isFullyReturned}
                         value={row.quantityToReturn}
-                        onChange={e => setRows(prev =>
-                          prev.map(r => r.bomId === row.bomId ? { ...r, quantityToReturn: Number(e.target.value) } : r)
-                        )}
-                        className="w-24 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-sm text-right text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        onChange={e => {
+                          const val = Math.min(Number(e.target.value), remaining);
+                          setRows(prev =>
+                            prev.map(r => r.bomId === row.bomId ? { ...r, quantityToReturn: val } : r)
+                          );
+                        }}
+                        className="w-24 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-sm text-right text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-40 disabled:cursor-not-allowed"
                       />
                     </td>
                     <td className="px-4 py-2">
@@ -269,15 +292,14 @@ export default function ReturnMaterialsPage() {
                       />
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           <div className="flex justify-end gap-3">
-            <Link href={`/job-orders/${joId}`}>
-              <Button variant="secondary">Cancel</Button>
-            </Link>
+            <Button href={`/job-orders/${joId}`} variant="secondary">Cancel</Button>
             <Button
               onClick={handleReturn}
               disabled={isSubmitting}

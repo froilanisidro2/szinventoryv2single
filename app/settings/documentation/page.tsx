@@ -1,7 +1,6 @@
 'use client';
 
 import { ArrowLeft, Shield, CheckCircle, XCircle, Info, Package, ShoppingCart, TrendingUp, FileText, CreditCard, ArrowRightLeft, BarChart3, Boxes, Users, Truck, Settings } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
@@ -134,12 +133,11 @@ export default function DocumentationPage() {
 
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link href="/settings">
-          <Button variant="secondary" size="sm">
+        
+          <Button href="/settings" variant="secondary" size="sm">
             <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
-        </Link>
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <Shield className="h-6 w-6 text-primary-600" />

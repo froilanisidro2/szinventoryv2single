@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Search, Box, ArrowLeft, Upload } from 'lucide-react';
-import Link from 'next/link';
+import { Plus, Edit2, Trash2, Search, Box, ArrowLeft, Upload, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -289,12 +288,11 @@ export default function BinLocationsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/settings">
-            <Button variant="secondary" size="sm">
+          
+            <Button href="/settings" variant="secondary" size="sm">
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
-          </Link>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <Box className="h-6 w-6 text-primary-600" />
@@ -307,16 +305,19 @@ export default function BinLocationsPage() {
 
       {/* Warehouse Selection */}
       <div className="flex gap-2 items-center">
-        <label className="text-sm font-medium">Warehouse:</label>
-        <select
-          value={filterWarehouse}
-          onChange={(e) => setFilterWarehouse(e.target.value)}
-          className="px-3 py-2 border rounded-lg dark:bg-gray-900 dark:border-gray-700"
-        >
-          {warehouses.map(w => (
-            <option key={w.id} value={w.id}>{fmtWarehouse(w)}</option>
-          ))}
-        </select>
+        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Warehouse:</label>
+        <div className="relative">
+          <select
+            value={filterWarehouse}
+            onChange={(e) => setFilterWarehouse(e.target.value)}
+            className="appearance-none pl-3 pr-8 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-900 dark:text-white shadow-sm hover:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors cursor-pointer"
+          >
+            {warehouses.map(w => (
+              <option key={w.id} value={w.id}>{fmtWarehouse(w)}</option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        </div>
       </div>
 
       {/* Controls */}

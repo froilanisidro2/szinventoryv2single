@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Mail, CheckCircle, XCircle, AlertCircle, Printer, Package } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getSuppliers, getPurchaseOrderItems, autoCreateGRNFromPurchaseOrder, getGRNByPurchaseOrderId, getPurchaseOrderExpectedDeliveryDate } from '@/app/actions';
@@ -259,12 +258,10 @@ export default function GRNDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href={`/purchase-orders/${id}`}>
-            <Button variant="ghost" size="sm" className="gap-2">
+          <Button href={`/purchase-orders/${id}`} variant="ghost" size="sm" className="gap-2">
               <ArrowLeft className="h-4 w-4" />
               Back to PO
             </Button>
-          </Link>
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{grn.grn_number}</h1>

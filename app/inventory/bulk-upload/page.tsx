@@ -2,18 +2,19 @@
 
 import { useState } from 'react';
 import { Upload, Download, ArrowLeft, AlertCircle, CheckCircle2 } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getProductBySku, createStockTransaction, updateStockLevels } from '@/app/actions';
 import { useWarehouse } from '@/contexts/warehouse-context';
 import { fmtWarehouse } from '@/lib/warehouse-utils';
 
+type ImportType = 'opening_balance' | 'inbound' | 'outbound';
+
 interface BulkImportItem {
   productSKU: string;
   productName: string;
   quantity: number;
-  type: 'inbound' | 'outbound';
+  type: ImportType;
   reference: string;
   reason: string;
   date: string;
@@ -26,14 +27,67 @@ interface RowResult {
   message: string;
 }
 
+const TYPE_CONFIG: Record<ImportType, {
+  label: string;
+  description: string;
+  color: string;
+  columns: string[];
+  example: string;
+  template: string;
+  requirements: string[];
+}> = {
+  opening_balance: {
+    label: 'Opening Balance',
+    description: 'Set starting stock for existing inventory',
+    color: 'border-emerald-500',
+    columns: ['Product SKU', 'Product Name', 'Quantity', 'Unit Cost', 'Date'],
+    template: 'Product SKU,Product Name,Quantity,Unit Cost,Date',
+    example: 'CAB-007,Cabinet Shelf Pin 5mm,100,5.50,2026-06-17',
+    requirements: [
+      'Products must exist (matched by SKU)',
+      'Required: SKU, Qty, Unit Cost, Date',
+      'Adds to on-hand stock as Opening Balance',
+      'Use once per product when going live',
+    ],
+  },
+  inbound: {
+    label: 'Inbound',
+    description: 'Stock receipts / additions',
+    color: 'border-blue-500',
+    columns: ['Product SKU', 'Product Name', 'Quantity', 'PO Number', 'Reason', 'Date', 'Unit Cost'],
+    template: 'Product SKU,Product Name,Quantity,PO Number,Reason,Date,Unit Cost',
+    example: 'PROD-001,Laptop Pro 15,50,PO-2026-001,Purchase Order,2026-06-17,1299.99',
+    requirements: [
+      'Products must exist (matched by SKU)',
+      'Required: SKU, Qty, PO Number, Reason, Date',
+      'Unit Cost is optional',
+    ],
+  },
+  outbound: {
+    label: 'Outbound',
+    description: 'Stock deductions / write-offs',
+    color: 'border-red-500',
+    columns: ['Product SKU', 'Product Name', 'Quantity', 'SO Number', 'Reason', 'Date'],
+    template: 'Product SKU,Product Name,Quantity,SO Number,Reason,Date',
+    example: 'PROD-001,Laptop Pro 15,20,SO-2026-001,Customer Sale,2026-06-17',
+    requirements: [
+      'Products must exist (matched by SKU)',
+      'Required: SKU, Qty, SO Number, Reason, Date',
+      'Deducts from on-hand stock',
+    ],
+  },
+};
+
 export default function BulkUploadPage() {
   const { selectedWarehouseId, selectedWarehouse } = useWarehouse();
-  const [uploadType, setUploadType] = useState<'inbound' | 'outbound'>('inbound');
+  const [uploadType, setUploadType] = useState<ImportType>('opening_balance');
   const [fileName, setFileName] = useState('');
   const [items, setItems] = useState<BulkImportItem[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [results, setResults] = useState<RowResult[]>([]);
+
+  const config = TYPE_CONFIG[uploadType];
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -47,35 +101,57 @@ export default function BulkUploadPage() {
     reader.onload = (event) => {
       try {
         const text = event.target?.result as string;
-        const rows = text.split('\n').slice(1); // skip header
+        const rows = text.split('\n').slice(1);
 
         const parsedItems: BulkImportItem[] = [];
         const rowErrors: string[] = [];
 
         rows.forEach((row, index) => {
           if (!row.trim()) return;
-          const [productSKU, productName, quantityStr, reference, reason, date, costStr] = row
-            .split(',')
-            .map((s) => s.trim());
+          const cols = row.split(',').map((s) => s.trim());
 
-          if (!productSKU) { rowErrors.push(`Row ${index + 2}: Product SKU is required`); return; }
-          if (!quantityStr || isNaN(parseInt(quantityStr)) || parseInt(quantityStr) <= 0) {
-            rowErrors.push(`Row ${index + 2}: Valid quantity > 0 is required`); return;
+          if (uploadType === 'opening_balance') {
+            const [productSKU, productName, quantityStr, costStr, date] = cols;
+            if (!productSKU) { rowErrors.push(`Row ${index + 2}: Product SKU is required`); return; }
+            if (!quantityStr || isNaN(parseFloat(quantityStr)) || parseFloat(quantityStr) <= 0) {
+              rowErrors.push(`Row ${index + 2}: Valid quantity > 0 is required`); return;
+            }
+            if (!costStr || isNaN(parseFloat(costStr))) {
+              rowErrors.push(`Row ${index + 2}: Unit Cost is required`); return;
+            }
+            if (!date) { rowErrors.push(`Row ${index + 2}: Date is required`); return; }
+
+            parsedItems.push({
+              productSKU,
+              productName: productName || productSKU,
+              quantity: parseFloat(quantityStr),
+              type: 'opening_balance',
+              reference: 'OPENING-BALANCE',
+              reason: 'Opening Balance',
+              date,
+              cost: parseFloat(costStr),
+            });
+          } else {
+            const [productSKU, productName, quantityStr, reference, reason, date, costStr] = cols;
+            if (!productSKU) { rowErrors.push(`Row ${index + 2}: Product SKU is required`); return; }
+            if (!quantityStr || isNaN(parseFloat(quantityStr)) || parseFloat(quantityStr) <= 0) {
+              rowErrors.push(`Row ${index + 2}: Valid quantity > 0 is required`); return;
+            }
+            if (!reference) { rowErrors.push(`Row ${index + 2}: Reference number is required`); return; }
+            if (!reason)    { rowErrors.push(`Row ${index + 2}: Reason is required`); return; }
+            if (!date)      { rowErrors.push(`Row ${index + 2}: Date is required`); return; }
+
+            parsedItems.push({
+              productSKU,
+              productName: productName || productSKU,
+              quantity: parseFloat(quantityStr),
+              type: uploadType,
+              reference,
+              reason,
+              date,
+              cost: costStr ? parseFloat(costStr) : undefined,
+            });
           }
-          if (!reference) { rowErrors.push(`Row ${index + 2}: Reference number is required`); return; }
-          if (!reason)    { rowErrors.push(`Row ${index + 2}: Reason is required`); return; }
-          if (!date)      { rowErrors.push(`Row ${index + 2}: Date is required`); return; }
-
-          parsedItems.push({
-            productSKU,
-            productName: productName || productSKU,
-            quantity: parseInt(quantityStr),
-            type: uploadType,
-            reference,
-            reason,
-            date,
-            cost: costStr ? parseFloat(costStr) : undefined,
-          });
         });
 
         setItems(parsedItems);
@@ -96,7 +172,6 @@ export default function BulkUploadPage() {
 
     for (const item of items) {
       try {
-        // 1. Look up product by SKU
         const productRes = await getProductBySku(item.productSKU);
         if (productRes.error || !productRes.data) {
           rowResults.push({ sku: item.productSKU, status: 'error', message: `SKU "${item.productSKU}" not found` });
@@ -105,21 +180,33 @@ export default function BulkUploadPage() {
         const product = productRes.data;
         const wh = selectedWarehouseId || undefined;
 
-        // 2. Create stock transaction record
+        const transactionType =
+          item.type === 'opening_balance' ? 'opening_balance'
+          : item.type === 'inbound' ? 'purchase'
+          : 'sale';
+
+        const referenceType =
+          item.type === 'opening_balance' ? 'opening_balance'
+          : item.type === 'inbound' ? 'bulk_inbound'
+          : 'bulk_outbound';
+
         await createStockTransaction({
           product_id: product.id,
           warehouse_id: wh,
-          transaction_type: item.type === 'inbound' ? 'purchase' : 'sale',
+          transaction_type: transactionType,
           quantity: item.quantity,
           notes: `${item.reason} | Ref: ${item.reference} | Date: ${item.date}`,
-          reference_type: item.type === 'inbound' ? 'bulk_inbound' : 'bulk_outbound',
+          reference_type: referenceType,
         });
 
-        // 3. Update stock level (+qty for inbound, -qty for outbound)
-        const delta = item.type === 'inbound' ? item.quantity : -item.quantity;
+        const delta = item.type === 'outbound' ? -item.quantity : item.quantity;
         await updateStockLevels(product.id, delta, wh);
 
-        rowResults.push({ sku: item.productSKU, status: 'success', message: `${item.type === 'inbound' ? '+' : '-'}${item.quantity} units` });
+        rowResults.push({
+          sku: item.productSKU,
+          status: 'success',
+          message: `${item.type === 'outbound' ? '-' : '+'}${item.quantity} units`,
+        });
       } catch (err) {
         rowResults.push({ sku: item.productSKU, status: 'error', message: err instanceof Error ? err.message : 'Unknown error' });
       }
@@ -133,22 +220,17 @@ export default function BulkUploadPage() {
 
     if (failCount === 0) {
       toast.success(`All ${successCount} items imported successfully!`);
-      setTimeout(() => { setItems([]); setFileName(''); setResults([]); }, 3000);
+      setTimeout(() => { setItems([]); setFileName(''); setResults([]);
+        const input = document.getElementById('file-upload') as HTMLInputElement;
+        if (input) input.value = '';
+      }, 3000);
     } else {
       toast.error(`${failCount} item(s) failed — ${successCount} succeeded`);
     }
   };
 
   const downloadTemplate = () => {
-    const headers = uploadType === 'inbound'
-      ? 'Product SKU,Product Name,Quantity,PO Number,Reason,Date,Unit Cost'
-      : 'Product SKU,Product Name,Quantity,SO Number,Reason,Date';
-
-    const example = uploadType === 'inbound'
-      ? 'PROD-001,Laptop Pro 15,50,PO-2026-001,Purchase Order,2026-03-29,1299.99'
-      : 'PROD-001,Laptop Pro 15,20,SO-2026-001,Customer Sale,2026-03-29';
-
-    const blob = new Blob([`${headers}\n${example}`], { type: 'text/csv' });
+    const blob = new Blob([`${config.template}\n${config.example}`], { type: 'text/csv' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `${uploadType}-template.csv`;
@@ -159,9 +241,8 @@ export default function BulkUploadPage() {
     <div className="space-y-6 p-4 md:p-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link href="/inventory/movements">
-          <Button variant="secondary" icon={<ArrowLeft className="h-4 w-4" />}>Back</Button>
-        </Link>
+        
+          <Button href="/inventory/movements" variant="secondary" icon={<ArrowLeft className="h-4 w-4" />}>Back</Button>
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <Upload className="h-8 w-8 text-primary-600" />
@@ -182,48 +263,65 @@ export default function BulkUploadPage() {
           <div className="card p-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Import Type</h3>
             <div className="space-y-2">
-              {(['inbound', 'outbound'] as const).map((t) => (
+              {(Object.entries(TYPE_CONFIG) as [ImportType, typeof TYPE_CONFIG[ImportType]][]).map(([t, c]) => (
                 <label
                   key={t}
-                  className="flex items-center gap-3 cursor-pointer p-3 rounded-lg border-2 transition-colors"
-                  style={{ borderColor: uploadType === t ? '#06b6d4' : '' }}
+                  className={`flex items-center gap-3 cursor-pointer p-3 rounded-lg border-2 transition-colors ${
+                    uploadType === t ? c.color : 'border-gray-200 dark:border-gray-700'
+                  }`}
                 >
                   <input
                     type="radio"
                     value={t}
                     checked={uploadType === t}
-                    onChange={() => { setUploadType(t); setItems([]); setErrors([]); setResults([]); }}
+                    onChange={() => { setUploadType(t); setItems([]); setErrors([]); setResults([]);
+                      const input = document.getElementById('file-upload') as HTMLInputElement;
+                      if (input) input.value = '';
+                      setFileName('');
+                    }}
                     className="w-4 h-4"
                   />
                   <div>
-                    <p className="font-semibold text-gray-900 dark:text-white capitalize">{t}</p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                      {t === 'inbound' ? 'Stock receipts / additions' : 'Stock shipments / deductions'}
-                    </p>
+                    <p className="font-semibold text-gray-900 dark:text-white">{c.label}</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">{c.description}</p>
                   </div>
                 </label>
               ))}
             </div>
           </div>
 
-          {/* Info */}
+          {/* Requirements */}
           <div className="card p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
             <h4 className="font-semibold text-blue-900 dark:text-blue-200 mb-2">Requirements</h4>
             <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
               <li>• CSV format only</li>
-              <li>• Products must exist (matched by SKU)</li>
-              <li>• Required: SKU, Qty, Reference, Reason, Date</li>
-              <li>• Stock levels update automatically</li>
+              {config.requirements.map((r, i) => <li key={i}>• {r}</li>)}
             </ul>
           </div>
 
-          <Button variant="secondary" className="w-full" icon={<Download className="h-4 w-4" />} onClick={downloadTemplate}>
+          {/* Columns info */}
+          <div className="card p-4">
+            <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-2 text-sm">CSV Columns</h4>
+            <ol className="text-xs text-gray-600 dark:text-gray-400 space-y-1 list-decimal list-inside">
+              {config.columns.map((col, i) => <li key={i}>{col}</li>)}
+            </ol>
+          </div>
+
+          <Button variant="secondary" className="w-full h-4 w-4" icon={<Download />} onClick={downloadTemplate}>
             Download Template
           </Button>
         </div>
 
         {/* Main */}
         <div className="lg:col-span-2 space-y-4">
+          {uploadType === 'opening_balance' && (
+            <div className="card p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+              <p className="text-sm text-emerald-800 dark:text-emerald-300">
+                <span className="font-semibold">Opening Balance</span> — use this once when setting up the system. It records your existing stock quantities and costs as the starting point for inventory tracking.
+              </p>
+            </div>
+          )}
+
           {/* File Upload */}
           <div className="card p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Upload CSV File</h3>
@@ -317,7 +415,12 @@ export default function BulkUploadPage() {
                         <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">SKU</th>
                         <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Product</th>
                         <th className="px-4 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">Qty</th>
-                        <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Reference</th>
+                        {uploadType !== 'outbound' && (
+                          <th className="px-4 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">Unit Cost</th>
+                        )}
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">
+                          {uploadType === 'opening_balance' ? 'Date' : 'Reference'}
+                        </th>
                         <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Date</th>
                       </tr>
                     </thead>
@@ -327,7 +430,14 @@ export default function BulkUploadPage() {
                           <td className="px-4 py-3 font-mono text-gray-900 dark:text-white">{item.productSKU}</td>
                           <td className="px-4 py-3 text-gray-900 dark:text-white">{item.productName}</td>
                           <td className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">{item.quantity}</td>
-                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{item.reference}</td>
+                          {uploadType !== 'outbound' && (
+                            <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
+                              {item.cost != null ? `₱${item.cost.toFixed(2)}` : '—'}
+                            </td>
+                          )}
+                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                            {uploadType === 'opening_balance' ? item.date : item.reference}
+                          </td>
                           <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{item.date}</td>
                         </tr>
                       ))}
@@ -346,7 +456,7 @@ export default function BulkUploadPage() {
                 onClick={handleImport}
                 disabled={isImporting || errors.length > 0}
               >
-                {isImporting ? 'Importing…' : `Import ${items.length} Items`}
+                {isImporting ? 'Importing…' : `Import ${items.length} ${config.label} Items`}
               </Button>
             </>
           )}

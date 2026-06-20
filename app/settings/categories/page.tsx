@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { 
@@ -218,12 +217,11 @@ export default function ProductPropertiesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/settings">
-            <Button variant="secondary" size="sm">
+          
+            <Button href="/settings" variant="secondary" size="sm">
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
-          </Link>
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Product Properties</h1>
             <p className="text-gray-600 dark:text-gray-400">Manage product reference data and classifications</p>

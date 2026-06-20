@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { Plus, Search, Filter, RefreshCw } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DataTable, Column } from '@/components/ui/data-table';
@@ -182,11 +181,10 @@ export default function PaymentsPage() {
           >
             Refresh
           </Button>
-          <Link href="/payments/record">
-            <Button variant="primary" icon={<Plus className="h-4 w-4" />}>
+          
+            <Button href="/payments/record" variant="primary" icon={<Plus className="h-4 w-4" />}>
               Record Payment
             </Button>
-          </Link>
         </div>
       </div>
 

@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut, Users, Settings, AlertCircle, Plus } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getCompanyById } from '@/app/actions';
@@ -181,11 +180,9 @@ export default function CompanyAdminDashboard() {
                     <Users className="h-5 w-5" />
                     Users
                   </h2>
-                  <Link href={`/admin/companies/${company.id}/users`}>
-                    <Button variant="primary" size="sm">
+                  <Button href={`/admin/companies/${company.id}/users`} variant="primary" size="sm">
                       Manage Users
                     </Button>
-                  </Link>
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                   {company.activeUsers} user{company.activeUsers !== 1 ? 's' : ''} active
@@ -196,12 +193,10 @@ export default function CompanyAdminDashboard() {
                   )}
                 </p>
                 {canAddMoreUsers && (
-                  <Link href={`/admin/companies/${company.id}/users/add`}>
-                    <Button variant="ghost" size="sm" className="w-full flex items-center justify-center gap-2">
+                  <Button href={`/admin/companies/${company.id}/users/add`} variant="ghost" size="sm" className="w-full flex items-center justify-center gap-2">
                       <Plus className="h-4 w-4" />
                       Add User
                     </Button>
-                  </Link>
                 )}
               </div>
 
@@ -216,11 +211,9 @@ export default function CompanyAdminDashboard() {
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                   Manage user roles and permissions
                 </p>
-                <Link href={`/admin/companies/${company.id}/roles`}>
-                  <Button variant="ghost" size="sm" className="w-full">
+                <Button href={`/admin/companies/${company.id}/roles`} variant="ghost" size="sm" className="w-full">
                     Configure Roles
                   </Button>
-                </Link>
               </div>
             </div>
           </div>

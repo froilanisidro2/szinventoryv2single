@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle, AlertCircle, Truck, Package } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import {
@@ -352,12 +351,10 @@ export default function ShipGoodsPage() {
     <div className="space-y-4 p-4 md:p-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link href={`/sales-orders/${id}`}>
-          <Button variant="ghost" size="sm" className="gap-1">
+        <Button href={`/sales-orders/${id}`} variant="ghost" size="sm" className="gap-1">
             <ArrowLeft className="h-4 w-4" />
             Back to SO
           </Button>
-        </Link>
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Ship Goods</h1>
           <p className="text-xs text-gray-600 dark:text-gray-400">Record shipped items and deduct from inventory</p>
@@ -606,9 +603,7 @@ export default function ShipGoodsPage() {
 
       {/* Action Buttons */}
       <div className="flex gap-3 justify-end">
-        <Link href={`/sales-orders/${id}`}>
-          <Button variant="secondary">Cancel</Button>
-        </Link>
+        <Button href={`/sales-orders/${id}`} variant="secondary">Cancel</Button>
         <Button
           onClick={handleShip}
           disabled={isSubmitting || items.length === 0}

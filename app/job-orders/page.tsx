@@ -43,13 +43,14 @@ const STATUS_LABELS: Record<string, string> = {
 const STATUS_OPTIONS = ['all', 'pending_approval', 'approved', 'in_progress', 'completed'] as const;
 
 function downloadCSV(rows: JobOrder[]) {
-  const headers = ['JO #', 'Title', 'Priority', 'Status', 'Production Lead', 'Start Date', 'Target Date'];
+  const headers = ['JO #', 'Title', 'Priority', 'Status', 'Production Lead', 'Date Created', 'Project Start', 'Project End Date'];
   const lines = rows.map(j => [
     j.jo_number,
     `"${(j.title ?? '').replace(/"/g, '""')}"`,
     PRIORITY_LABELS[j.priority] ?? j.priority,
     STATUS_LABELS[j.status] ?? j.status,
     j.production_lead ?? '',
+    j.created_at ? new Date(j.created_at).toLocaleDateString() : '',
     j.start_date ? new Date(j.start_date).toLocaleDateString() : '',
     j.target_completion_date ? new Date(j.target_completion_date).toLocaleDateString() : '',
   ]);
@@ -69,6 +70,8 @@ export default function JobOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   useEffect(() => {
     loadData();
@@ -90,6 +93,8 @@ export default function JobOrdersPage() {
   const filtered = useMemo(() => {
     let list = statusFilter === 'all' ? jobs : jobs.filter(j => j.status === statusFilter);
     if (priorityFilter) list = list.filter(j => j.priority === priorityFilter);
+    if (dateFrom) list = list.filter(j => j.created_at && new Date(j.created_at) >= new Date(dateFrom));
+    if (dateTo) list = list.filter(j => j.created_at && new Date(j.created_at) <= new Date(dateTo + 'T23:59:59'));
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       list = list.filter(j =>
@@ -99,9 +104,9 @@ export default function JobOrdersPage() {
       );
     }
     return list;
-  }, [jobs, statusFilter, priorityFilter, search]);
+  }, [jobs, statusFilter, priorityFilter, dateFrom, dateTo, search]);
 
-  const hasActiveFilters = search || priorityFilter || statusFilter !== 'all';
+  const hasActiveFilters = search || priorityFilter || statusFilter !== 'all' || dateFrom || dateTo;
 
   return (
     <div className="flex-1 space-y-4 p-6">
@@ -113,12 +118,11 @@ export default function JobOrdersPage() {
             <p className="text-sm text-gray-500 dark:text-gray-400">Manage production job orders and material usage</p>
           </div>
         </div>
-        <Link href="/job-orders/create">
-          <Button className="flex items-center gap-2">
+        
+          <Button href="/job-orders/create" className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
             New Job Order
           </Button>
-        </Link>
       </div>
 
       {/* Search + Filter + CSV */}
@@ -165,9 +169,27 @@ export default function JobOrdersPage() {
           ))}
         </select>
 
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">Date Created:</span>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={e => setDateFrom(e.target.value)}
+            className="py-2 px-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+          <span className="text-xs text-gray-400">to</span>
+          <input
+            type="date"
+            value={dateTo}
+            min={dateFrom || undefined}
+            onChange={e => setDateTo(e.target.value)}
+            className="py-2 px-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+        </div>
+
         {hasActiveFilters && (
           <button
-            onClick={() => { setSearch(''); setPriorityFilter(''); setStatusFilter('all'); }}
+            onClick={() => { setSearch(''); setPriorityFilter(''); setStatusFilter('all'); setDateFrom(''); setDateTo(''); }}
             className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 underline"
           >
             Clear filters
@@ -208,8 +230,9 @@ export default function JobOrdersPage() {
                 <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Priority</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Status</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Production Lead</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Start Date</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Target Date</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Date Created</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Project Start</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Project End Date</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Actions</th>
               </tr>
             </thead>
@@ -234,6 +257,11 @@ export default function JobOrdersPage() {
                   </td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
                     {job.production_lead || '—'}
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
+                    {job.created_at
+                      ? new Date(job.created_at).toLocaleDateString()
+                      : '—'}
                   </td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
                     {job.start_date

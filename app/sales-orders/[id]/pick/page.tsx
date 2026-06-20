@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle, AlertCircle, Package, Zap } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { fmtWarehouse } from '@/lib/warehouse-utils';
@@ -404,12 +403,10 @@ export default function PickItemsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href={`/sales-orders/${id}`}>
-            <Button variant="ghost" size="sm" className="gap-1">
+          <Button href={`/sales-orders/${id}`} variant="ghost" size="sm" className="gap-1">
               <ArrowLeft className="h-4 w-4" />
               Back to SO
             </Button>
-          </Link>
           <div>
             <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <Package className="h-5 w-5" />
@@ -419,9 +416,7 @@ export default function PickItemsPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Link href={`/sales-orders/${id}`}>
-            <Button variant="secondary" size="sm">Cancel</Button>
-          </Link>
+          <Button href={`/sales-orders/${id}`} variant="secondary" size="sm">Cancel</Button>
           <Button
             onClick={handleFillAll}
             disabled={isSubmitting || items.length === 0}

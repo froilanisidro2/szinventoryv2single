@@ -140,12 +140,11 @@ function CreateMaterialRequestForm() {
     <div className="flex-1 space-y-6 p-6 max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/material-requests">
-          <Button variant="secondary" size="sm" className="flex items-center gap-2">
+        
+          <Button href="/material-requests" variant="secondary" size="sm" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
-        </Link>
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">New Material Request (MRF)</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">Procurement MRF — for purchasing materials from a supplier. To allocate more of an item to a Job Order&apos;s Bill of Materials, use that JO&apos;s &quot;Request MRF&quot; instead.</p>
@@ -294,9 +293,8 @@ function CreateMaterialRequestForm() {
 
         {/* Actions */}
         <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
-          <Link href="/material-requests">
-            <Button variant="secondary">Cancel</Button>
-          </Link>
+          
+            <Button href="/material-requests" variant="secondary">Cancel</Button>
           <div className="flex items-center gap-3">
             {isAdmin && (
               <Button

@@ -236,9 +236,8 @@ export default function InviteUserPage() {
 
           {/* Form Actions */}
           <div className="flex gap-3 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <Link href="/users">
-              <Button variant="secondary">Cancel</Button>
-            </Link>
+            
+              <Button href="/users" variant="secondary">Cancel</Button>
             <Button
               variant="primary"
               type="submit"

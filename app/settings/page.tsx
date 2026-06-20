@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Save, Bell, Database, Warehouse, FolderTree, Users, Briefcase, Shield, FileText, Box, UserCheck, Upload, X, BookOpen, Mail } from 'lucide-react';
+import { Save, Bell, Database, Warehouse, FolderTree, Users, Briefcase, Shield, Box, UserCheck, Upload, X, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,7 +61,12 @@ export default function SettingsPage() {
     loadCompanyData();
   }, []);
 
-  const isAdmin = user?.isCompanyAdmin === true || user?.role === 'admin' || user?.role === 'super_admin';
+  const perms: string[] = user?.permissions ?? [];
+  const isAdmin = user?.isCompanyAdmin === true
+    || user?.role === 'admin'
+    || user?.role === 'super_admin'
+    || perms.includes('all')
+    || perms.includes('settings:write');
 
   const handleSaveCompany = async () => {
     if (!company?.id) return;
@@ -166,8 +171,6 @@ export default function SettingsPage() {
     { id: 'suppliers', label: 'Suppliers', icon: Briefcase, href: '/settings/suppliers' },
     { id: 'customers', label: 'Customers', icon: Users, href: '/settings/customers' },
     { id: 'roles', label: 'Roles & Permissions', icon: Shield, href: '/settings/roles' },
-    { id: 'audit', label: 'Audit Logs', icon: FileText, href: '/settings/audit-logs' },
-    { id: 'documentation', label: 'Roles Documentation', icon: BookOpen, href: '/settings/documentation' },
     { id: 'email', label: 'Email Settings', icon: Mail, href: '/settings/email' },
     { id: 'notifications', label: 'Notifications', icon: Bell },
   ];

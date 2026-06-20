@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Users, Warehouse, CheckCircle } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { createCompany } from '@/app/actions';
@@ -125,12 +124,11 @@ export default function CreateCompanyPage() {
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="px-4 py-4 md:px-6 flex items-center gap-4">
-          <Link href="/superadmin">
-            <Button variant="ghost" size="sm" className="gap-2">
+          
+            <Button href="/superadmin" variant="ghost" size="sm" className="gap-2">
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
-          </Link>
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Create New Company</h1>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Set up a new company with an initial admin account</p>
@@ -302,9 +300,8 @@ export default function CreateCompanyPage() {
 
           {/* Actions */}
           <div className="flex gap-3">
-            <Link href="/superadmin" className="flex-1">
-              <Button variant="ghost" className="w-full">Cancel</Button>
-            </Link>
+            
+              <Button href="/superadmin" className="flex-1 w-full" variant="ghost">Cancel</Button>
             <button
               type="submit"
               disabled={isLoading}

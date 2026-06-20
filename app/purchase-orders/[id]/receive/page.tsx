@@ -371,12 +371,10 @@ export default function ReceiveGoodsPage() {
   return (
     <div className="space-y-4 p-4 md:p-6 max-w-6xl mx-auto">
       <div className="flex items-center gap-4">
-        <Link href={`/purchase-orders/${id}`}>
-          <Button variant="ghost" size="sm" className="gap-2">
+        <Button href={`/purchase-orders/${id}`} variant="ghost" size="sm" className="gap-2">
             <ArrowLeft className="h-4 w-4" />
             Back to PO
           </Button>
-        </Link>
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Receive Goods</h1>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Record received items and add them to inventory</p>
@@ -438,9 +436,8 @@ export default function ReceiveGoodsPage() {
               <p className="text-gray-600 dark:text-gray-400 mb-4">
                 {!hasWarehouses ? 'Configure warehouses to receive goods' : 'Configure bin locations to receive goods'}
               </p>
-              <Link href={!hasWarehouses ? '/settings/warehouses' : '/settings/bin-locations'}>
-                <Button size="sm" variant="primary">Go to Settings</Button>
-              </Link>
+              
+                <Button href={!hasWarehouses ? '/settings/warehouses' : '/settings/bin-locations'} size="sm" variant="primary">Go to Settings</Button>
             </div>
           ) : groupedItems.length > 0 ? (
             <table className="w-full text-sm">
@@ -638,9 +635,7 @@ export default function ReceiveGoodsPage() {
       </div>
 
       <div className="flex gap-3 justify-end">
-        <Link href={`/purchase-orders/${id}`}>
-          <Button variant="secondary">Cancel</Button>
-        </Link>
+        <Button href={`/purchase-orders/${id}`} variant="secondary">Cancel</Button>
         <Button
           variant="primary"
           onClick={handleReceive}

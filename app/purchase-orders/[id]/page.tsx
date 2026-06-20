@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, AlertCircle, Printer, Mail, RotateCcw, Calendar, Truck, PackageCheck } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import {
@@ -336,12 +335,11 @@ ${companyName}`;
         {/* Web Header - Hide completely on print */}
         <div className="flex items-center justify-between print-hide mb-6">
           <div className="flex items-center gap-4">
-            <Link href="/purchase-orders">
-              <Button variant="ghost" size="sm" className="gap-2">
+            
+              <Button href="/purchase-orders" variant="ghost" size="sm" className="gap-2">
                 <ArrowLeft className="h-4 w-4" />
                 Back
               </Button>
-            </Link>
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{order.po_number}</h1>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
@@ -815,8 +813,7 @@ ${companyName}`;
 
                   {/* Partially Received → Receive (Admin, Manager) */}
                   {order.status === 'partially_received' && (
-                    <Link href={`/purchase-orders/${order.id}/receive`}>
-                      <Button
+                    <Button href={`/purchase-orders/${order.id}/receive`}
                         variant="primary"
                         className="w-full"
                         disabled={!canManageInbound}
@@ -824,7 +821,6 @@ ${companyName}`;
                       >
                         Receive Goods
                       </Button>
-                    </Link>
                   )}
 
                   {!canManageInbound && (

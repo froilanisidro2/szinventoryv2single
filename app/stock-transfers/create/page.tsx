@@ -6,7 +6,7 @@ import { ArrowLeft, Plus, Trash2, Search } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { createStockTransfer, createStockTransferItems, getWarehouses, getProducts, getBinLocationsByWarehouse, getBinStock } from '@/app/actions';
+import { createStockTransfer, createStockTransferItems, getWarehouses, getProducts, getBinLocationsByWarehouse, getBinStock, getStockLevelsForProducts } from '@/app/actions';
 import { fmtWarehouseWithCity } from '@/lib/warehouse-utils';
 
 interface LineItem {
@@ -29,6 +29,8 @@ export default function CreateTransferPage() {
   const [productSearch, setProductSearch] = useState('');
   // bin_stock map: binId → { productId → qty }
   const [binStockMap, setBinStockMap] = useState<Record<string, Record<string, number>>>({});
+  // warehouse-level stock: productId → { on_hand, available }
+  const [warehouseStock, setWarehouseStock] = useState<Record<string, { on_hand: number; available: number }>>({});
 
   const today = new Date().toISOString().split('T')[0] || '';
   const [formData, setFormData] = useState({
@@ -49,11 +51,10 @@ export default function CreateTransferPage() {
   }, []);
 
   useEffect(() => {
-    if (!formData.fromWarehouseId) { setFromBins([]); return; }
+    if (!formData.fromWarehouseId) { setFromBins([]); setWarehouseStock({}); return; }
     getBinLocationsByWarehouse(formData.fromWarehouseId).then(async (res) => {
       const bins = Array.isArray(res.data) ? res.data : [];
       setFromBins(bins);
-      // Load bin stock for all source bins
       const stockMap: Record<string, Record<string, number>> = {};
       await Promise.all(bins.map(async (bin: any) => {
         const stockRes = await getBinStock(bin.id);
@@ -63,7 +64,19 @@ export default function CreateTransferPage() {
       }));
       setBinStockMap(stockMap);
     });
-  }, [formData.fromWarehouseId]);
+    // Load warehouse-level availability for all products in source warehouse
+    if (products.length > 0) {
+      const ids = products.map((p: any) => p.id);
+      getStockLevelsForProducts(ids, formData.fromWarehouseId).then((res) => {
+        const levels: Record<string, { on_hand: number; available: number }> = {};
+        const rows = Array.isArray(res.data) ? res.data : (res as any);
+        (Array.isArray(rows) ? rows : []).forEach((r: any) => {
+          levels[r.product_id] = { on_hand: r.quantity_on_hand ?? 0, available: r.quantity_available ?? 0 };
+        });
+        setWarehouseStock(levels);
+      });
+    }
+  }, [formData.fromWarehouseId, products]);
 
   useEffect(() => {
     if (!formData.toWarehouseId) { setToBins([]); return; }
@@ -112,6 +125,22 @@ export default function CreateTransferPage() {
     const invalidItems = lineItems.filter((i) => !i.productId || i.quantityRequested < 1);
     if (invalidItems.length > 0) {
       toast.error('All items need a product and quantity ≥ 1');
+      return;
+    }
+
+    // Stock availability validation
+    const overAllocated = lineItems.filter((item) => {
+      if (!item.productId) return false;
+      const available = warehouseStock[item.productId]?.available ?? null;
+      return available !== null && item.quantityRequested > available;
+    });
+    if (overAllocated.length > 0) {
+      const names = overAllocated.map((i) => {
+        const p = products.find((p: any) => p.id === i.productId);
+        const avail = warehouseStock[i.productId]?.available ?? 0;
+        return `${p?.name ?? i.productId} (need ${i.quantityRequested}, have ${avail})`;
+      });
+      toast.error(`Insufficient stock:\n${names.join('\n')}`);
       return;
     }
 
@@ -164,8 +193,12 @@ export default function CreateTransferPage() {
     }
   };
 
-  const formatBinLabel = (bin: any) =>
-    `${bin.zone} — ${bin.aisle}-${bin.shelf}-${bin.bin_number}`;
+  const formatBinLabel = (bin: any) => {
+    const parts = [bin.zone, bin.aisle, bin.shelf, bin.bin_number].filter(Boolean);
+    const structured = parts.join('-');
+    if (bin.location_name) return structured ? `${bin.location_name} (${structured})` : bin.location_name;
+    return structured || bin.id?.slice(0, 8) || 'Unknown';
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
@@ -294,6 +327,19 @@ export default function CreateTransferPage() {
                           <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
                         ))}
                       </select>
+                      {/* Warehouse stock hint */}
+                      {item.productId && formData.fromWarehouseId && (() => {
+                        const s = warehouseStock[item.productId];
+                        if (!s) return null;
+                        const isOver = item.quantityRequested > s.available;
+                        return (
+                          <p className={`text-xs mt-0.5 ${isOver ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
+                            {isOver
+                              ? `⚠ Only ${s.available} available`
+                              : `Available: ${s.available}`}
+                          </p>
+                        );
+                      })()}
                     </div>
 
                     {/* From Bin */}
@@ -382,9 +428,8 @@ export default function CreateTransferPage() {
 
           {/* Actions */}
           <div className="flex justify-end gap-3">
-            <Link href="/stock-transfers">
-              <Button variant="secondary">Cancel</Button>
-            </Link>
+            
+              <Button href="/stock-transfers" variant="secondary">Cancel</Button>
             <Button variant="primary" type="submit" disabled={isLoading}>
               {isLoading ? 'Creating...' : 'Create Transfer'}
             </Button>

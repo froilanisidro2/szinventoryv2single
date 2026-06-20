@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, Eye, EyeOff, Copy, Check } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { createCompany } from '@/app/actions';
@@ -188,16 +187,14 @@ export default function CreateCompanyPage() {
 
           {/* Buttons */}
           <div className="flex gap-3 justify-center pt-4">
-            <Link href="/admin" className="flex-1">
-              <Button variant="secondary" className="w-full">
+            
+              <Button href="/admin" className="flex-1 w-full" variant="secondary">
                 Back to Companies
               </Button>
-            </Link>
-            <Link href="/auth/login" className="flex-1">
-              <Button variant="primary" className="w-full">
+            
+              <Button href="/auth/login" className="flex-1 w-full" variant="primary">
                 Go to Login
               </Button>
-            </Link>
           </div>
         </div>
       </div>
@@ -208,12 +205,11 @@ export default function CreateCompanyPage() {
     <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/admin">
-          <Button variant="ghost" size="sm" className="gap-2">
+        
+          <Button href="/admin" variant="ghost" size="sm" className="gap-2">
             <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
-        </Link>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Create New Company</h1>
       </div>
 
@@ -410,9 +406,8 @@ export default function CreateCompanyPage() {
           >
             {isLoading ? 'Creating...' : 'Create Company'}
           </Button>
-          <Link href="/admin">
-            <Button variant="secondary">Cancel</Button>
-          </Link>
+          
+            <Button href="/admin" variant="secondary">Cancel</Button>
         </div>
       </form>
     </div>

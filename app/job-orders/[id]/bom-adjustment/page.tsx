@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { ArrowLeft, Trash2, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -143,12 +142,10 @@ export default function RequestMaterialsPage() {
   return (
     <div className="flex-1 space-y-6 p-6 max-w-4xl mx-auto">
       <div className="flex items-center gap-4">
-        <Link href={`/job-orders/${joId}`}>
-          <Button variant="secondary" size="sm" className="flex items-center gap-2">
+        <Button href={`/job-orders/${joId}`} variant="secondary" size="sm" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
             Back to JO
           </Button>
-        </Link>
         <div>
           <div className="flex items-center gap-2">
             <ClipboardList className="h-5 w-5 text-amber-600 dark:text-amber-400" />
@@ -276,9 +273,7 @@ export default function RequestMaterialsPage() {
         </div>
 
         <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
-          <Link href={`/job-orders/${joId}`}>
-            <Button variant="secondary">Cancel</Button>
-          </Link>
+          <Button href={`/job-orders/${joId}`} variant="secondary">Cancel</Button>
           <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-amber-600 hover:bg-amber-700 text-white">
             {isSubmitting ? 'Submitting…' : 'Submit for Approval'}
           </Button>

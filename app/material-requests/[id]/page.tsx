@@ -176,12 +176,11 @@ export default function MaterialRequestDetailPage() {
     <div className="flex-1 p-4 md:p-6 space-y-4 max-w-7xl mx-auto">
       {/* Top bar: back + MRF title */}
       <div className="flex items-center gap-3">
-        <Link href="/material-requests">
-          <Button variant="secondary" size="sm" className="flex items-center gap-2">
+        
+          <Button href="/material-requests" variant="secondary" size="sm" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
-        </Link>
         <ClipboardList className="h-5 w-5 text-gray-500 dark:text-gray-400" />
         <h1 className="text-xl font-bold text-gray-900 dark:text-white font-mono">{mrf.mrf_number}</h1>
         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[mrf.status]}`}>

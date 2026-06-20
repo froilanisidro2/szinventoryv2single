@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "generate-sw": "node scripts/generate-sw.js"
+    "generate-sw": "node scripts/generate-sw.js",
+    "seed": "node --env-file=.env scripts/seed.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.0",

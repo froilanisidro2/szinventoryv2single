@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { Plus, Search, FileText, User, Calendar, Eye, Truck, Package, CheckCircle, Download, Mail } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Pagination } from '@/components/ui/pagination';
@@ -327,11 +326,10 @@ ${companyName}`);
           <Button variant="secondary" icon={<Download className="h-4 w-4" />} onClick={downloadCSV}>
             CSV
           </Button>
-          <Link href="/sales-orders/create">
-            <Button variant="primary" icon={<Plus className="h-4 w-4" />}>
+          
+            <Button href="/sales-orders/create" variant="primary" icon={<Plus className="h-4 w-4" />}>
               Create SO
             </Button>
-          </Link>
         </div>
       </div>
 
@@ -454,20 +452,16 @@ ${companyName}`);
                             </Button>
                           )}
                           {order.status === 'confirmed' && (
-                            <Link href={`/sales-orders/${order.id}/pick`}>
-                              <Button variant="primary" size="sm" className="gap-1">
+                            <Button href={`/sales-orders/${order.id}/pick`} variant="primary" size="sm" className="gap-1">
                                 <Package className="h-4 w-4" />
                                 Pick
                               </Button>
-                            </Link>
                           )}
                           {(order.status === 'picked' || order.status === 'partially_shipped') && (
-                            <Link href={`/sales-orders/${order.id}/ship`}>
-                              <Button variant="primary" size="sm" className="gap-1">
+                            <Button href={`/sales-orders/${order.id}/ship`} variant="primary" size="sm" className="gap-1">
                                 <Truck className="h-4 w-4" />
                                 Ship
                               </Button>
-                            </Link>
                           )}
                           {order.status === 'partially_shipped' && (
                             <Button
@@ -491,12 +485,10 @@ ${companyName}`);
                           >
                             <Mail className="h-4 w-4" />
                           </Button>
-                          <Link href={`/sales-orders/${order.id}`} className="inline-flex">
-                            <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50 dark:hover:bg-primary-900/10">
+                          <Button href={`/sales-orders/${order.id}`} className="inline-flex text-primary-600 hover:text-primary-700 hover:bg-primary-50 dark:hover:bg-primary-900/10" variant="ghost" size="sm">
                               <Eye className="h-4 w-4" />
                               View
                             </Button>
-                          </Link>
                         </div>
                       </td>
                     </tr>

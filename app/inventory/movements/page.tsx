@@ -12,6 +12,7 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Download,
   Plus,
   X,
@@ -54,6 +55,7 @@ const TYPE_CONFIG: Record<string, { label: string; color: string; icon: React.Re
   damaged:    { label: 'Damaged',    color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',            icon: <TrendingDown className="h-3.5 w-3.5" />,    sign: '-', qtyColor: 'text-gray-500 dark:text-gray-400' },
   return:     { label: 'Return',     color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300', icon: <ArrowDownCircle className="h-3.5 w-3.5" />, sign: '+', qtyColor: 'text-purple-600 dark:text-purple-400' },
   return_to_supplier: { label: 'Return', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300', icon: <ArrowUpCircle className="h-3.5 w-3.5" />, sign: '-', qtyColor: 'text-purple-600 dark:text-purple-400' },
+  opening_balance:   { label: 'Opening Balance', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300', icon: <ArrowDownCircle className="h-3.5 w-3.5" />, sign: '+', qtyColor: 'text-emerald-600 dark:text-emerald-400' },
 };
 
 const SOURCE_CONFIG: Record<string, { label: string; color: string; href?: (id: string) => string }> = {
@@ -66,7 +68,7 @@ const SOURCE_CONFIG: Record<string, { label: string; color: string; href?: (id: 
 
 type TypeFilter = 'all' | 'inbound' | 'outbound' | 'reserved' | 'adjusted' | 'rejected';
 
-const TYPE_ALIASES: Record<string, string> = { in: 'inbound', out: 'outbound', adjustment: 'adjusted', return: 'inbound', return_to_supplier: 'outbound' };
+const TYPE_ALIASES: Record<string, string> = { in: 'inbound', out: 'outbound', adjustment: 'adjusted', return: 'inbound', return_to_supplier: 'outbound', opening_balance: 'inbound' };
 const normalizeType = (t: string) => TYPE_ALIASES[t] ?? t;
 
 // Date helpers
@@ -320,59 +322,9 @@ export default function StockMovementsPage() {
       </div>
 
       {/* Filters */}
-      <div className="card p-3 space-y-3">
-        {/* Date presets */}
-        <div className="flex flex-wrap gap-1.5 items-center">
-          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium mr-1">Period:</span>
-          {PRESETS.map(preset => (
-            <button
-              key={preset.label}
-              onClick={() => applyPreset(preset)}
-              className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-                activePreset === preset.label
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
-            >
-              {preset.label}
-            </button>
-          ))}
-          {/* Custom date range */}
-          <div className="flex items-center gap-1.5 ml-auto">
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => { setDateFrom(e.target.value); setActivePreset(''); }}
-              className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs"
-            />
-            <span className="text-xs text-gray-400">–</span>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => { setDateTo(e.target.value); setActivePreset(''); }}
-              className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs"
-            />
-          </div>
-        </div>
-
-        {/* Type + Search */}
+      <div className="card p-3">
         <div className="flex flex-wrap gap-2 items-center">
-          <div className="flex gap-1 flex-wrap">
-            {TYPE_TABS.map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setTypeFilter(key)}
-                className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
-                  typeFilter === key
-                    ? 'bg-gray-700 text-white dark:bg-gray-200 dark:text-gray-900'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          {/* Search */}
+          {/* Search — leftmost */}
           <div className="relative flex-1 min-w-[160px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
             <input
@@ -380,8 +332,55 @@ export default function StockMovementsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search product, SKU, notes…"
-              className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
+          </div>
+
+          {/* Period dropdown with visible chevron */}
+          <div className="relative">
+            <select
+              value={activePreset}
+              onChange={(e) => {
+                const preset = PRESETS.find(p => p.label === e.target.value);
+                if (preset) applyPreset(preset);
+              }}
+              className="appearance-none pl-3 pr-7 py-1.5 text-xs font-medium rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
+            >
+              {PRESETS.map(p => (
+                <option key={p.label} value={p.label}>{p.label}</option>
+              ))}
+              {!activePreset && <option value="">Custom</option>}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400" />
+          </div>
+
+          {/* Custom date range */}
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => { setDateFrom(e.target.value); setActivePreset(''); }}
+            className="px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+          <span className="text-xs text-gray-400">–</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => { setDateTo(e.target.value); setActivePreset(''); }}
+            className="px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+
+          {/* Type dropdown */}
+          <div className="relative">
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
+              className="appearance-none pl-3 pr-7 py-1.5 text-xs font-medium rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
+            >
+              {TYPE_TABS.map(({ key, label }) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400" />
           </div>
         </div>
       </div>

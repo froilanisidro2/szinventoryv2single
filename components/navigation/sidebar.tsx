@@ -102,7 +102,7 @@ export function Sidebar() {
 
       {/* Bottom: Settings (admin only) + role badge */}
       <div className="border-t border-gray-200 p-4 dark:border-gray-800 space-y-1">
-        {isAdmin && (
+        {user && (
           <Link
             href="/settings"
             className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"

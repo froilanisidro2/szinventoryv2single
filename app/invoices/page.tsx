@@ -2,7 +2,6 @@
 
 import { useEffect, useState, Fragment } from 'react';
 import { Plus, Search, CheckCircle, Clock, AlertCircle, ChevronDown, ChevronUp, CreditCard, X, Ban, Truck, Printer } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { fmtWarehouse } from '@/lib/warehouse-utils';
@@ -329,9 +328,8 @@ export default function SalesInvoicesPage() {
               : `Manage invoices and record payments (${filtered.length})`}
           </p>
         </div>
-        <Link href="/invoices/create">
-          <Button variant="primary" icon={<Plus className="h-4 w-4" />}>Create Invoice</Button>
-        </Link>
+        
+          <Button href="/invoices/create" variant="primary" icon={<Plus className="h-4 w-4" />}>Create Invoice</Button>
       </div>
 
       {/* Filters */}

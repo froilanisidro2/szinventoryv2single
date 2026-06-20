@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { PackagePlus, ArrowLeft, Save, Warehouse } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { getWarehouses, getBinLocationsByWarehouse, createProduct, getSuppliers } from '@/app/actions';
 import { toast } from 'sonner';
@@ -243,11 +242,10 @@ export default function AddProductPage() {
     <div className="space-y-6 p-4 md:p-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link href="/products">
-          <Button variant="secondary" icon={<ArrowLeft className="h-4 w-4" />}>
+        
+          <Button href="/products" variant="secondary" icon={<ArrowLeft className="h-4 w-4" />}>
             Back
           </Button>
-        </Link>
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
             Add New Product
@@ -805,16 +803,15 @@ export default function AddProductPage() {
 
                 {/* Action Buttons */}
                 <div className="flex gap-3 p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-                  <Link href="/products" className="flex-1">
-                    <Button variant="secondary" className="w-full py-2.5">
+                  
+                    <Button href="/products" className="flex-1 w-full py-2.5" variant="secondary">
                       Cancel
                     </Button>
-                  </Link>
                   <Button
                     type="submit"
                     variant="primary"
-                    className="flex-1 py-2.5"
-                    icon={<Save className="h-4 w-4" />}
+                    className="flex-1 py-2.5 h-4 w-4"
+                    icon={<Save />}
                     disabled={isLoading}
                   >
                     {isLoading ? 'Adding Product...' : 'Save Product'}

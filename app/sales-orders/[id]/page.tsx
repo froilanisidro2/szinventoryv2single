@@ -190,12 +190,11 @@ export default function SalesOrderDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/sales-orders">
-            <Button variant="ghost" size="sm" className="gap-1">
+          
+            <Button href="/sales-orders" variant="ghost" size="sm" className="gap-1">
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
-          </Link>
           <div>
             <h1 className="text-xl font-bold text-gray-900 dark:text-white">{order.so_number}</h1>
             <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -380,12 +379,10 @@ export default function SalesOrderDetailPage() {
                     <span className="font-medium text-green-600">₱{parseFloat(String(invoice.amount_paid || invoice.paid_amount || 0)).toFixed(2)}</span>
                   </div>
                 )}
-                <Link href={`/invoices?id=${invoice.id}`}>
-                  <Button variant="secondary" size="sm" className="w-full gap-1.5 mt-1">
+                <Button href={`/invoices?id=${invoice.id}`} variant="secondary" size="sm" className="w-full gap-1.5 mt-1">
                     <FileText className="h-3.5 w-3.5" />
                     View Invoice
                   </Button>
-                </Link>
               </div>
             ) : (
               <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -426,12 +423,10 @@ export default function SalesOrderDetailPage() {
                 {/* Confirmed → Pick Items (Admin, Manager) */}
                 {order.status === 'confirmed' && (
                   canPickShip ? (
-                    <Link href={`/sales-orders/${order.id}/pick`}>
-                      <Button variant="primary" className="w-full gap-2">
+                    <Button href={`/sales-orders/${order.id}/pick`} variant="primary" className="w-full gap-2">
                         <Package className="h-4 w-4" />
                         Pick Items
                       </Button>
-                    </Link>
                   ) : (
                     <Button variant="primary" className="w-full gap-2" disabled title="Requires Admin or Manager role">
                       <Package className="h-4 w-4" />
@@ -443,12 +438,10 @@ export default function SalesOrderDetailPage() {
                 {/* Picked → Ship Items (Admin, Manager) */}
                 {order.status === 'picked' && (
                   canPickShip ? (
-                    <Link href={`/sales-orders/${order.id}/ship`}>
-                      <Button variant="primary" className="w-full gap-2">
+                    <Button href={`/sales-orders/${order.id}/ship`} variant="primary" className="w-full gap-2">
                         <Truck className="h-4 w-4" />
                         Ship Items
                       </Button>
-                    </Link>
                   ) : (
                     <Button variant="primary" className="w-full gap-2" disabled title="Requires Admin or Manager role">
                       <Truck className="h-4 w-4" />
@@ -460,12 +453,10 @@ export default function SalesOrderDetailPage() {
                 {/* Partially Shipped → Continue Shipping (Admin, Manager) */}
                 {order.status === 'partially_shipped' && (
                   canPickShip ? (
-                    <Link href={`/sales-orders/${order.id}/ship`}>
-                      <Button variant="primary" className="w-full gap-2">
+                    <Button href={`/sales-orders/${order.id}/ship`} variant="primary" className="w-full gap-2">
                         <Truck className="h-4 w-4" />
                         Continue Shipping
                       </Button>
-                    </Link>
                   ) : (
                     <Button variant="primary" className="w-full gap-2" disabled title="Requires Admin or Manager role">
                       <Truck className="h-4 w-4" />

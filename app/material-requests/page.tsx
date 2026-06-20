@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { ClipboardList, AlertCircle, Search, Download, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { getMaterialRequests, getJobOrderMRFRequests, getCompanyUsers, updateMaterialRequestStatus, cancelJobOrderBOMRequest } from '@/app/actions';
-import { getCurrentUser } from '@/lib/auth-utils';
+import { getMaterialRequests, getJobOrderMRFRequests, getJobOrderMaterialIssueSlips, getCompanyUsers, updateMaterialRequestStatus, cancelJobOrderBOMRequest } from '@/app/actions';
+import { useCurrentUser } from '@/lib/use-current-user';
 import type { MaterialRequest } from '@/types';
 
 const URGENCY_LABELS: Record<string, string> = {
@@ -29,6 +29,7 @@ const STATUS_LABELS: Record<string, string> = {
   approved: 'Approved',
   rejected: 'Rejected',
   cancelled: 'Cancelled',
+  issued: 'Issued',
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -37,24 +38,26 @@ const STATUS_COLORS: Record<string, string> = {
   approved: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
   rejected: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
   cancelled: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400',
+  issued: 'bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300',
 };
 
 const TYPE_LABELS: Record<string, string> = {
   procurement: 'Procurement',
-  jo_mrf: 'JO Adjustment',
+  bom_issue: 'BOM Issue',
 };
 
 const TYPE_COLORS: Record<string, string> = {
   procurement: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
   jo_mrf: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300',
+  bom_issue: 'bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300',
 };
 
-const STATUS_OPTIONS = ['all', 'draft', 'pending_approval', 'approved', 'rejected', 'cancelled'] as const;
+const STATUS_OPTIONS = ['all', 'draft', 'pending_approval', 'approved', 'issued', 'rejected', 'cancelled'] as const;
 
-/** Unified row shape for both Procurement MRFs and Job Order MRF (BOM adjustment) requests. */
+/** Unified row shape for Procurement MRFs, Job Order MRF (BOM adjustment) requests, and BOM Issue Slips. */
 interface UnifiedRow {
   id: string;
-  type: 'procurement' | 'jo_mrf';
+  type: 'procurement' | 'jo_mrf' | 'bom_issue';
   number: string;
   created_at: string;
   requestor_user_id?: string;
@@ -86,9 +89,10 @@ function downloadCSV(rows: UnifiedRow[], userMap: Record<string, string>) {
 }
 
 export default function MaterialRequestsPage() {
-  const currentUser = getCurrentUser();
+  const currentUser = useCurrentUser();
   const [mrfs, setMrfs] = useState<MaterialRequest[]>([]);
   const [joMrfs, setJoMrfs] = useState<any[]>([]);
+  const [bomIssues, setBomIssues] = useState<any[]>([]);
   const [userMap, setUserMap] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -104,9 +108,10 @@ export default function MaterialRequestsPage() {
   async function loadData() {
     setIsLoading(true);
     try {
-      const [mrfsRes, joMrfsRes, usersRes] = await Promise.all([
+      const [mrfsRes, joMrfsRes, bomIssuesRes, usersRes] = await Promise.all([
         getMaterialRequests(),
         getJobOrderMRFRequests(),
+        getJobOrderMaterialIssueSlips(),
         getCompanyUsers(),
       ]);
       if (mrfsRes.error) {
@@ -115,6 +120,7 @@ export default function MaterialRequestsPage() {
         setMrfs(mrfsRes.data ?? []);
       }
       if (!joMrfsRes.error) setJoMrfs(joMrfsRes.data ?? []);
+      if (!bomIssuesRes.error) setBomIssues(bomIssuesRes.data ?? []);
       if (!usersRes.error) setUserMap(usersRes.data ?? {});
     } catch {
       toast.error('Error loading data');
@@ -136,19 +142,19 @@ export default function MaterialRequestsPage() {
       job_order: m.job_order,
       raw: m,
     }));
-    const joAdjustments: UnifiedRow[] = joMrfs.map((r: any) => ({
+    const bomIssueRows: UnifiedRow[] = bomIssues.map((r: any) => ({
       id: r.id,
-      type: 'jo_mrf',
-      number: r.request_number || '—',
-      created_at: r.created_at,
-      requestor_user_id: r.requested_by_user_id,
+      type: 'bom_issue',
+      number: r.mis_number || '—',
+      created_at: r.issued_at || r.created_at,
+      requestor_user_id: r.issued_by_user_id,
       status: r.status,
-      detail: r.product?.name ? `${r.product.name} — qty ${Number(r.requested_quantity).toLocaleString()}` : '—',
+      detail: r.job_order?.jo_number ? `${r.job_order.jo_number}${r.job_order.title ? ` — ${r.job_order.title}` : ''}` : '—',
       job_order: r.job_order,
       raw: r,
     }));
-    return [...procurement, ...joAdjustments].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  }, [mrfs, joMrfs]);
+    return [...procurement, ...bomIssueRows].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [mrfs, joMrfs, bomIssues]);
 
   const filtered = useMemo(() => {
     let list = statusFilter === 'all' ? unified : unified.filter(m => m.status === statusFilter);
@@ -346,7 +352,13 @@ export default function MaterialRequestsPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <Link
-                        href={mrf.type === 'procurement' ? `/material-requests/${mrf.id}` : `/job-orders/${mrf.job_order?.id}?tab=bomRequests`}
+                        href={
+                          mrf.type === 'procurement'
+                            ? `/material-requests/${mrf.id}`
+                            : mrf.type === 'bom_issue'
+                            ? `/job-orders/${mrf.job_order?.id}?tab=issues`
+                            : `/job-orders/${mrf.job_order?.id}?tab=bomRequests`
+                        }
                         className="text-primary-600 hover:underline dark:text-primary-400 text-xs font-medium"
                       >
                         View

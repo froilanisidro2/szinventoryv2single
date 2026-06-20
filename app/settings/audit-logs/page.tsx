@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Search, Download, Filter, RefreshCw, Activity } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { getAuditLogs } from '@/app/actions';
@@ -123,12 +122,11 @@ export default function AuditLogsPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/settings">
-            <Button variant="secondary" size="sm">
+          
+            <Button href="/settings" variant="secondary" size="sm">
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
-          </Link>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <Activity className="h-7 w-7 text-primary-600" />

@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getCompanies } from '@/app/actions';
 import { logout, getSuperAdminSession } from '@/lib/auth-utils';
-import Link from 'next/link';
 
 interface CompanyWithStats {
   id: string;
@@ -199,11 +198,10 @@ export default function SuperAdminDashboard() {
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Companies</h2>
-            <Link href="/superadmin/companies/create">
-              <Button variant="primary" size="sm">
+            
+              <Button href="/superadmin/companies/create" variant="primary" size="sm">
                 Create Company
               </Button>
-            </Link>
           </div>
 
           {isLoading ? (
@@ -220,11 +218,10 @@ export default function SuperAdminDashboard() {
           ) : companies.length === 0 ? (
             <div className="px-6 py-8 text-center">
               <p className="text-gray-600 dark:text-gray-400 mb-4">No companies yet</p>
-              <Link href="/superadmin/companies/create">
-                <Button variant="primary" size="sm">
+              
+                <Button href="/superadmin/companies/create" variant="primary" size="sm">
                   Create First Company
                 </Button>
-              </Link>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -271,12 +268,10 @@ export default function SuperAdminDashboard() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <Link href={`/superadmin/companies/${company.id}`}>
-                          <Button variant="ghost" size="sm" className="flex items-center gap-2">
+                        <Button href={`/superadmin/companies/${company.id}`} variant="ghost" size="sm" className="flex items-center gap-2">
                             <Settings className="h-4 w-4" />
                             <span className="hidden sm:inline">Manage</span>
                           </Button>
-                        </Link>
                       </td>
                     </tr>
                   ))}

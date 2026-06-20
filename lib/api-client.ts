@@ -149,3 +149,15 @@ export async function apiDelete<T>(
 ): Promise<ApiResponse<T>> {
   return apiCall<T>(url, { method: 'DELETE' });
 }
+
+/**
+ * RPC — call a Postgres function via PostgREST /rpc/:name
+ * The function runs atomically inside a single DB transaction.
+ */
+export async function apiRpc<T = void>(
+  functionName: string,
+  params: Record<string, unknown>
+): Promise<ApiResponse<T>> {
+  const base = process.env.POSTGREST_URL || 'http://localhost:8036';
+  return apiCall<T>(`${base}/rpc/${functionName}`, { method: 'POST', body: params });
+}

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { ArrowLeft, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -135,12 +134,11 @@ export default function CreateJobOrderPage() {
     <div className="flex-1 space-y-6 p-6 max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/job-orders">
-          <Button variant="secondary" size="sm" className="flex items-center gap-2">
+        
+          <Button href="/job-orders" variant="secondary" size="sm" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
-        </Link>
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">New Job Order</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">Create a production job order with Bill of Materials</p>
@@ -352,7 +350,7 @@ export default function CreateJobOrderPage() {
         </div>
 
         <div className="flex justify-end gap-3 pt-2 border-t border-gray-200 dark:border-gray-700">
-          <Link href="/job-orders"><Button variant="secondary">Cancel</Button></Link>
+          <Button href="/job-orders" variant="secondary">Cancel</Button>
           <Button onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? 'Creating…' : 'Create Job Order'}
           </Button>

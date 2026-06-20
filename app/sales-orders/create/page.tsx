@@ -608,9 +608,8 @@ export default function CreateSOPage() {
 
           {/* Form Actions */}
           <div className="lg:col-span-4 flex justify-end gap-3">
-            <Link href="/sales-orders">
-              <Button variant="secondary">Cancel</Button>
-            </Link>
+            
+              <Button href="/sales-orders" variant="secondary">Cancel</Button>
             <Button
               variant="primary"
               type="submit"

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Mail, Save, Send, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getCompanyEmailSettings, saveCompanyEmailSettings, markEmailSettingsVerified } from '@/app/actions';
@@ -142,12 +141,11 @@ export default function EmailSettingsPage() {
     <div className="space-y-6 p-4 md:p-6 max-w-2xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link href="/settings">
-          <Button variant="secondary" size="sm">
+        
+          <Button href="/settings" variant="secondary" size="sm">
             <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
-        </Link>
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <Mail className="h-6 w-6 text-primary-600" />

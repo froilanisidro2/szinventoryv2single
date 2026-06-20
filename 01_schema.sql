@@ -1539,3 +1539,72 @@ FOR EACH ROW EXECUTE FUNCTION update_sales_order_items_timestamp();
 -- =====================================================
 -- END OF SCHEMA
 -- =====================================================
+
+
+-- =====================================================
+-- ATOMIC STOCK ADJUSTMENT FUNCTION
+-- Replaces all read-then-write stock updates.
+-- Eliminates race conditions for concurrent sessions.
+-- =====================================================
+CREATE OR REPLACE FUNCTION adjust_stock_level(
+  p_company_id      UUID,
+  p_product_id      UUID,
+  p_warehouse_id    UUID,
+  p_on_hand_delta   INTEGER DEFAULT 0,
+  p_alloc_delta     INTEGER DEFAULT 0,
+  p_rejected_delta  INTEGER DEFAULT 0,
+  p_scrapped_delta  INTEGER DEFAULT 0
+)
+RETURNS VOID
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_rows INTEGER;
+BEGIN
+  UPDATE stock_levels
+  SET
+    quantity_on_hand   = GREATEST(0, quantity_on_hand   + p_on_hand_delta),
+    quantity_allocated = GREATEST(0, quantity_allocated + p_alloc_delta),
+    quantity_rejected  = GREATEST(0, quantity_rejected  + p_rejected_delta),
+    quantity_scrapped  = GREATEST(0, quantity_scrapped  + p_scrapped_delta),
+    updated_at         = NOW()
+  WHERE company_id  = p_company_id
+    AND product_id  = p_product_id
+    AND (
+      (p_warehouse_id IS NULL AND warehouse_id IS NULL)
+      OR warehouse_id = p_warehouse_id
+    );
+
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+
+  IF v_rows = 0 THEN
+    BEGIN
+      INSERT INTO stock_levels (
+        company_id, product_id, warehouse_id,
+        quantity_on_hand, quantity_allocated, quantity_rejected, quantity_scrapped
+      ) VALUES (
+        p_company_id, p_product_id, p_warehouse_id,
+        GREATEST(0, p_on_hand_delta),
+        GREATEST(0, p_alloc_delta),
+        GREATEST(0, p_rejected_delta),
+        GREATEST(0, p_scrapped_delta)
+      );
+    EXCEPTION WHEN unique_violation THEN
+      -- Concurrent INSERT won the race — retry the UPDATE
+      UPDATE stock_levels
+      SET
+        quantity_on_hand   = GREATEST(0, quantity_on_hand   + p_on_hand_delta),
+        quantity_allocated = GREATEST(0, quantity_allocated + p_alloc_delta),
+        quantity_rejected  = GREATEST(0, quantity_rejected  + p_rejected_delta),
+        quantity_scrapped  = GREATEST(0, quantity_scrapped  + p_scrapped_delta),
+        updated_at         = NOW()
+      WHERE company_id  = p_company_id
+        AND product_id  = p_product_id
+        AND (
+          (p_warehouse_id IS NULL AND warehouse_id IS NULL)
+          OR warehouse_id = p_warehouse_id
+        );
+    END;
+  END IF;
+END;
+$$;

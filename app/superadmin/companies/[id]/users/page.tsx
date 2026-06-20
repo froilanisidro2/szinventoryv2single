@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, AlertCircle, Users, Plus, MoreVertical, Edit2, Shield, Trash2, CheckCircle, XCircle, AlertTriangle, Eye, EyeOff, Copy as CopyIcon, Key } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { deleteUserPermanently, changeUserRole, toggleUserStatus, createCompanyAdmin, updateUserDetails, resetUserPassword, getCompanyUsersByCompanyId, getRoles } from '@/app/actions';
@@ -338,12 +337,10 @@ export default function CompanyUsersPage() {
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="px-4 py-4 md:px-6">
-          <Link href={`/superadmin/companies/${companyId}`}>
-            <Button variant="ghost" size="sm" className="gap-2 mb-4">
+          <Button href={`/superadmin/companies/${companyId}`} variant="ghost" size="sm" className="gap-2 mb-4">
               <ArrowLeft className="h-4 w-4" />
               Back to Company
             </Button>
-          </Link>
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -538,11 +535,9 @@ export default function CompanyUsersPage() {
 
         {/* Back Button */}
         <div className="mt-6">
-          <Link href={`/superadmin/companies/${companyId}`}>
-            <Button variant="ghost">
+          <Button href={`/superadmin/companies/${companyId}`} variant="ghost">
               ← Back
             </Button>
-          </Link>
         </div>
       </main>
 

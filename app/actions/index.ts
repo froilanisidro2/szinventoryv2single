@@ -1,6 +1,6 @@
 'use server';
 
-import { apiGet, apiPost, apiPatch, apiDelete, apiUpsert } from '@/lib/api-client';
+import { apiGet, apiPost, apiPatch, apiDelete, apiUpsert, apiRpc } from '@/lib/api-client';
 import { API_ENDPOINTS } from '@/lib/api-endpoints';
 import { Product, Customer, Supplier, Invoice, GRN } from '@/types';
 import { cookies } from 'next/headers';
@@ -1743,7 +1743,7 @@ export async function uploadCompanyLogo(formData: FormData) {
  */
 export async function getUsersByCompany(companyId: string, limit = 100, offset = 0) {
   return apiGet<any[]>(
-    `${API_ENDPOINTS.USERS}?company_id=eq.${companyId}&deleted_at=is.null&order=is_company_admin.desc,created_at.desc&limit=${limit}&offset=${offset}`
+    `${API_ENDPOINTS.USERS}?company_id=eq.${companyId}&deleted_at=is.null&order=is_company_admin.desc,created_at.desc&limit=${limit}&offset=${offset}&select=*,roles(name)`
   );
 }
 
@@ -2403,158 +2403,78 @@ export async function transferStockBetweenBins(
 
 // ============= INVENTORY INTEGRATION (Receiving) =============
 
-/**
- * Shared helper: find the stock level record for a product in a specific warehouse.
- * - If warehouseId is provided: matches on product + company + warehouse (per-warehouse tracking).
- * - Falls back to the first unscoped record for the product so legacy rows are still found.
- */
-async function findStockLevel(productId: string, companyId: string, warehouseId?: string) {
-  // 1. Try exact match: product + company + warehouse
-  if (warehouseId) {
-    const scoped = await apiGet<any[]>(
-      `${API_ENDPOINTS.STOCK_LEVELS}?product_id=eq.${productId}&company_id=eq.${companyId}&warehouse_id=eq.${warehouseId}`
-    );
-    if (scoped.data && Array.isArray(scoped.data) && scoped.data.length > 0) {
-      return scoped.data[0];
-    }
-  }
-
-  // 2. Fallback: match product + company without warehouse filter (legacy / unassigned rows)
-  const fallback = await apiGet<any[]>(
-    `${API_ENDPOINTS.STOCK_LEVELS}?product_id=eq.${productId}&company_id=eq.${companyId}&limit=1`
-  );
-  if (fallback.data && Array.isArray(fallback.data) && fallback.data.length > 0) {
-    return fallback.data[0];
-  }
-
-  return null;
+// Shared helper — all stock mutations go through the atomic Postgres RPC.
+// The function does UPDATE first (row-level lock), then INSERT on first occurrence,
+// with an exception handler for the concurrent-insert race — no read-then-write.
+function rpcAdjustStock(
+  companyId: string,
+  productId: string,
+  warehouseId: string | null | undefined,
+  onHandDelta: number,
+  allocDelta: number,
+  rejectedDelta = 0,
+  scrappedDelta = 0,
+) {
+  return apiRpc('adjust_stock_level', {
+    p_company_id:     companyId,
+    p_product_id:     productId,
+    p_warehouse_id:   warehouseId ?? null,
+    p_on_hand_delta:  onHandDelta,
+    p_alloc_delta:    allocDelta,
+    p_rejected_delta: rejectedDelta,
+    p_scrapped_delta: scrappedDelta,
+  });
 }
 
 export async function updateStockLevels(
   productId: string,
   quantityChange: number,
-  warehouseId?: string
+  warehouseId?: string,
 ) {
-  const companyId = getCurrentUserCompanyId();
-  const stockLevel = await findStockLevel(productId, companyId, warehouseId);
-
-  if (stockLevel) {
-    return apiPatch<any>(
-      `${API_ENDPOINTS.STOCK_LEVELS}?id=eq.${stockLevel.id}`,
-      { quantity_on_hand: Math.max(0, (stockLevel.quantity_on_hand || 0) + quantityChange) }
-    );
-  }
-  // Create new per-warehouse stock level
-  return apiPost<any>(API_ENDPOINTS.STOCK_LEVELS, {
-    company_id: companyId,
-    product_id: productId,
-    warehouse_id: warehouseId ?? null,
-    quantity_on_hand: Math.max(0, quantityChange),
-  });
+  return rpcAdjustStock(getCurrentUserCompanyId(), productId, warehouseId, quantityChange, 0);
 }
 
 export async function updateStockReservation(
   productId: string,
   reservationQuantityChange: number,
-  warehouseId?: string
+  warehouseId?: string,
 ) {
-  const companyId = getCurrentUserCompanyId();
-  const stockLevel = await findStockLevel(productId, companyId, warehouseId);
-
-  if (stockLevel) {
-    return apiPatch<any>(
-      `${API_ENDPOINTS.STOCK_LEVELS}?id=eq.${stockLevel.id}`,
-      { quantity_allocated: Math.max(0, (stockLevel.quantity_allocated || 0) + reservationQuantityChange) }
-    );
-  }
-  // Create new per-warehouse stock level with reservation
-  return apiPost<any>(API_ENDPOINTS.STOCK_LEVELS, {
-    company_id: companyId,
-    product_id: productId,
-    warehouse_id: warehouseId ?? null,
-    quantity_allocated: Math.max(0, reservationQuantityChange),
-  });
+  return rpcAdjustStock(getCurrentUserCompanyId(), productId, warehouseId, 0, reservationQuantityChange);
 }
 
-/**
- * Atomic update of both on_hand and allocated in a SINGLE read + SINGLE write.
- * Use this for ship/fulfillment to prevent race conditions.
- * Always pass warehouseId to deduct from the correct warehouse.
- */
 export async function updateStockLevelAtomic(
   productId: string,
   onHandDelta: number,
   reservedDelta: number,
-  warehouseId?: string
+  warehouseId?: string,
 ) {
-  const companyId = getCurrentUserCompanyId();
-  const stockLevel = await findStockLevel(productId, companyId, warehouseId);
-
-  if (stockLevel) {
-    return apiPatch<any>(
-      `${API_ENDPOINTS.STOCK_LEVELS}?id=eq.${stockLevel.id}`,
-      {
-        quantity_on_hand: Math.max(0, (stockLevel.quantity_on_hand || 0) + onHandDelta),
-        quantity_allocated: Math.max(0, (stockLevel.quantity_allocated || 0) + reservedDelta),
-      }
-    );
-  }
-  return apiPost<any>(API_ENDPOINTS.STOCK_LEVELS, {
-    company_id: companyId,
-    product_id: productId,
-    warehouse_id: warehouseId ?? null,
-    quantity_on_hand: Math.max(0, onHandDelta),
-    quantity_allocated: Math.max(0, reservedDelta),
-  });
+  return rpcAdjustStock(getCurrentUserCompanyId(), productId, warehouseId, onHandDelta, reservedDelta);
 }
 
 export async function updateStockRejection(
   productId: string,
-  rejectionQuantityChange: number
+  rejectionQuantityChange: number,
+  warehouseId?: string,
 ) {
-  const companyId = getCurrentUserCompanyId();
-  
-  // Get existing stock level for this product in company
-  const response = await apiGet<any[]>(`${API_ENDPOINTS.STOCK_LEVELS}?product_id=eq.${productId}&company_id=eq.${companyId}`);
-  
-  if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-    // Update existing stock level
-    const stockLevel = response.data[0];
-    
-    // When rejecting items:
-    // - Reduce quantity_on_hand (items are no longer available)
-    // - Increase quantity_rejected (items in rejection queue)
-    const newOnHandQty = Math.max(0, (stockLevel.quantity_on_hand || 0) - rejectionQuantityChange);
-    const newRejectionQty = Math.max(0, (stockLevel.quantity_rejected || 0) + rejectionQuantityChange);
-    
-    // Create stock transaction for audit trail
-    try {
-      await createStockTransaction({
-        product_id: productId,
-        transaction_type: 'rejected',
-        quantity: rejectionQuantityChange,
-        notes: 'Items marked as rejected during QC',
-      });
-    } catch (error) {
-      // Log but don't fail if transaction creation fails
-    }
-    
-    // Update stock levels with both on_hand reduction and rejection increase
-    return apiPatch<any>(
-      `${API_ENDPOINTS.STOCK_LEVELS}?id=eq.${stockLevel.id}`,
-      {
-        quantity_on_hand: newOnHandQty,
-        quantity_rejected: newRejectionQty,
-      }
-    );
-  } else {
-    // Create new stock level with rejection (shouldn't normally happen)
-    return apiPost<any>(API_ENDPOINTS.STOCK_LEVELS, {
-      company_id: companyId,
+  // Audit trail
+  try {
+    await createStockTransaction({
       product_id: productId,
-      quantity_rejected: Math.max(0, rejectionQuantityChange),
+      transaction_type: 'rejected',
+      quantity: rejectionQuantityChange,
+      notes: 'Items marked as rejected during QC',
     });
-  }
+  } catch { /* non-fatal */ }
+
+  // Atomically: deduct on_hand, credit rejected
+  return rpcAdjustStock(
+    getCurrentUserCompanyId(),
+    productId,
+    warehouseId,
+    -rejectionQuantityChange,
+    0,
+    rejectionQuantityChange,
+  );
 }
 
 export async function processRejectionDisposition(
@@ -2588,7 +2508,6 @@ export async function processRejectionDisposition(
       };
     }
 
-    let updatePayload: Record<string, any> = {};
     let transactionType = 'adjusted';
 
     // For return_to_supplier, find the originating PO via GRN items
@@ -2618,52 +2537,35 @@ export async function processRejectionDisposition(
       }
     }
 
+    // Deltas for the atomic RPC call
+    let onHandDelta = 0, rejectedDelta = 0, scrappedDelta = 0;
+
     switch (dispositionType) {
       case 'return_to_supplier':
-        // Items leave inventory — reduce rejected quantity
-        updatePayload = {
-          quantity_rejected: Math.max(0, (stockLevel.quantity_rejected || 0) - quantity),
-        };
+        rejectedDelta = -quantity;
         transactionType = 'return_to_supplier';
         break;
-
       case 'rework':
-        // Items stay in rejected queue, just tracked
-        updatePayload = {};
+        // No stock change — just audit trail
         transactionType = 'adjusted';
         break;
-
       case 'scrap':
-        // Items written off — reduce rejected quantity, track scrapped total
-        updatePayload = {
-          quantity_rejected: Math.max(0, (stockLevel.quantity_rejected || 0) - quantity),
-          quantity_scrapped: (stockLevel.quantity_scrapped || 0) + quantity,
-        };
+        rejectedDelta = -quantity;
+        scrappedDelta = quantity;
         transactionType = 'adjusted';
         break;
-
       case 'restock':
-        // Inspection error — move back to usable on_hand
-        updatePayload = {
-          quantity_on_hand: (stockLevel.quantity_on_hand || 0) + quantity,
-          quantity_rejected: Math.max(0, (stockLevel.quantity_rejected || 0) - quantity),
-        };
+        onHandDelta = quantity;
+        rejectedDelta = -quantity;
         transactionType = 'inbound';
         break;
-
       default:
-        return {
-          data: null,
-          error: { message: 'Invalid disposition type' },
-        };
+        return { data: null, error: { message: 'Invalid disposition type' } };
     }
 
-    // Update stock levels
-    if (Object.keys(updatePayload).length > 0) {
-      await apiPatch<any>(
-        `${API_ENDPOINTS.STOCK_LEVELS}?id=eq.${stockLevel.id}`,
-        updatePayload
-      );
+    // Atomic stock update (GREATEST(0,…) guards prevent negative counts)
+    if (onHandDelta !== 0 || rejectedDelta !== 0 || scrappedDelta !== 0) {
+      await rpcAdjustStock(companyId, productId, stockLevel.warehouse_id ?? null, onHandDelta, 0, rejectedDelta, scrappedDelta);
     }
 
     // Create transaction record with PO reference when returning to supplier
@@ -4088,6 +3990,15 @@ export async function getJobOrderMRFRequests(status?: string) {
   return { data: JSON.parse(JSON.stringify(Array.isArray(res.data) ? res.data : [])), error: null };
 }
 
+/** All Material Issue Slips linked to Job Orders — "BOM Issue" rows for the unified Material Requests list. */
+export async function getJobOrderMaterialIssueSlips() {
+  const companyId = getCurrentUserCompanyId();
+  const url = `${API_ENDPOINTS.MATERIAL_ISSUE_SLIPS}?company_id=eq.${companyId}&job_order_id=not.is.null&order=created_at.desc&select=*,job_order:job_orders(id,jo_number,title)`;
+  const res = await apiGet<any[]>(url);
+  if (res.error) return { data: [], error: res.error };
+  return { data: JSON.parse(JSON.stringify(Array.isArray(res.data) ? res.data : [])), error: null };
+}
+
 export async function getMaterialRequestById(id: string) {
   const companyId = getCurrentUserCompanyId();
   const res = await apiGet<any[]>(
@@ -4507,7 +4418,7 @@ export async function getMaterialIssueSlipById(id: string) {
 
 export async function getMaterialIssueSlipItems(misId: string) {
   const res = await apiGet<any[]>(
-    `${API_ENDPOINTS.MATERIAL_ISSUE_SLIP_ITEMS}?material_issue_slip_id=eq.${misId}&order=created_at.asc`
+    `${API_ENDPOINTS.MATERIAL_ISSUE_SLIP_ITEMS}?material_issue_slip_id=eq.${misId}&order=created_at.asc&select=*,product:products(id,name,sku,unit_of_measure)`
   );
   if (res.error) return { data: [], error: res.error };
   return { data: JSON.parse(JSON.stringify(Array.isArray(res.data) ? res.data : [])), error: null };
@@ -4769,7 +4680,8 @@ export async function restockReturnedMaterials(mrsId: string) {
         reference_type: 'material_return_slip',
       });
     } else if (item.condition === 'scrap') {
-      // Log scrap write-off (stock was already removed on issue; just record it)
+      // Stock was already deducted on issue; just increment the scrapped counter and log it
+      await rpcAdjustStock(companyId, item.product_id, mrs.warehouse_id ?? null, 0, 0, 0, item.quantity_returned);
       await createStockTransaction({
         product_id: item.product_id,
         transaction_type: 'adjustment',
